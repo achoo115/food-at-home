@@ -37,20 +37,27 @@ export function ReceiptScanner({ onAdd, onDone }: Props) {
 
     const reader = new FileReader()
     reader.onload = async () => {
-      const base64 = (reader.result as string).split(',')[1]
+      const dataUrl = reader.result as string
+      const base64 = dataUrl.split(',')[1]
+      // Detect media type from data URL (e.g. "data:image/png;base64,...")
+      const mediaType = dataUrl.split(';')[0].split(':')[1] || 'image/png'
 
       try {
         const { data, error: fnError } = await supabase.functions.invoke('scan-receipt', {
-          body: { imageBase64: base64 },
+          body: { imageBase64: base64, mediaType },
         })
 
         if (fnError) throw new Error(fnError.message)
+        if (data?.error) throw new Error(data.error)
 
-        const items = Array.isArray(data) ? data : JSON.parse(data)
+        const items = Array.isArray(data) ? data : JSON.parse(typeof data === 'string' ? data : JSON.stringify(data))
+        if (!Array.isArray(items) || items.length === 0) {
+          throw new Error('No food items found in image')
+        }
         setScannedItems(items)
         setLocations(Object.fromEntries(items.map((_: unknown, i: number) => [i, 'fridge'])))
-      } catch {
-        setError('Could not read receipt. Try manual entry.')
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not read receipt. Try manual entry.')
       }
       setScanning(false)
     }
