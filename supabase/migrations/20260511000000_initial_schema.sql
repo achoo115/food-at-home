@@ -1,9 +1,8 @@
--- Enable UUID generation
-create extension if not exists "uuid-ossp";
+-- Use gen_random_uuid() (built-in to Postgres 13+, no extension needed)
 
 -- Inventory items
 create table inventory_items (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null,
   name text not null,
   category text not null check (category in ('produce', 'protein', 'dairy', 'grain', 'condiment', 'beverage', 'snack', 'other')),
@@ -23,7 +22,7 @@ create policy "Users manage own items" on inventory_items
 
 -- Recipes
 create table recipes (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null,
   title text not null,
   description text,
@@ -42,7 +41,7 @@ create policy "Users manage own recipes" on recipes
 
 -- Recipe ingredients
 create table recipe_ingredients (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   recipe_id uuid references recipes(id) on delete cascade not null,
   name text not null,
   quantity numeric,
@@ -61,7 +60,7 @@ create policy "Users manage own recipe ingredients" on recipe_ingredients
 
 -- Cooking log
 create table cooking_log (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null,
   recipe_id uuid references recipes(id) on delete set null,
   cooked_at timestamptz not null default now(),
@@ -76,7 +75,7 @@ create policy "Users manage own cooking log" on cooking_log
 
 -- Achievements
 create table achievements (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null,
   type text not null,
   earned_at timestamptz not null default now(),
@@ -90,7 +89,7 @@ create policy "Users manage own achievements" on achievements
 
 -- Grocery list
 create table grocery_list (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null,
   name text not null,
   quantity numeric not null default 1,
