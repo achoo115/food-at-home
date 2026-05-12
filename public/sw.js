@@ -1,10 +1,6 @@
-const CACHE_NAME = 'food-at-home-v1'
-const STATIC_ASSETS = ['/', '/index.html']
+const CACHE_NAME = 'food-at-home-v2'
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
-  )
   self.skipWaiting()
 })
 
@@ -18,13 +14,25 @@ self.addEventListener('activate', (event) => {
 })
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.url.includes('/rest/') || event.request.url.includes('/functions/')) {
+  const url = new URL(event.request.url)
+
+  // Network-first for HTML and API calls
+  if (event.request.mode === 'navigate' || url.pathname === '/' ||
+      url.pathname.includes('/rest/') || url.pathname.includes('/functions/')) {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match(event.request))
+      fetch(event.request)
+        .then((response) => {
+          const clone = response.clone()
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone))
+          return response
+        })
+        .catch(() => caches.match(event.request))
     )
-  } else {
-    event.respondWith(
-      caches.match(event.request).then((cached) => cached || fetch(event.request))
-    )
+    return
   }
+
+  // Cache-first for static assets (JS, CSS, images)
+  event.respondWith(
+    caches.match(event.request).then((cached) => cached || fetch(event.request))
+  )
 })
