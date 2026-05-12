@@ -76,22 +76,44 @@ export function ReceiptScanner({ onAdd, onDone }: Props) {
 
   if (scannedItems.length === 0) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-3">
         <input
           ref={fileRef}
           type="file"
           accept="image/*"
-          capture="environment"
           onChange={(e) => e.target.files?.[0] && handleCapture(e.target.files[0])}
           className="hidden"
         />
-        <button
-          onClick={() => fileRef.current?.click()}
-          disabled={scanning}
-          className="w-full py-12 border-2 border-dashed border-gray-300 rounded-xl text-gray-500"
-        >
-          {scanning ? 'Scanning receipt...' : 'Tap to take a photo of your receipt'}
-        </button>
+        {scanning ? (
+          <div className="w-full py-12 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 text-center">
+            Scanning receipt...
+          </div>
+        ) : (
+          <>
+            <button
+              onClick={() => {
+                if (fileRef.current) {
+                  fileRef.current.setAttribute('capture', 'environment')
+                  fileRef.current.click()
+                }
+              }}
+              className="w-full py-6 border-2 border-dashed border-gray-300 rounded-xl text-gray-500"
+            >
+              Take a photo
+            </button>
+            <button
+              onClick={() => {
+                if (fileRef.current) {
+                  fileRef.current.removeAttribute('capture')
+                  fileRef.current.click()
+                }
+              }}
+              className="w-full py-6 border-2 border-dashed border-gray-300 rounded-xl text-gray-500"
+            >
+              Choose from library
+            </button>
+          </>
+        )}
         {error && <p className="text-red-500 text-sm">{error}</p>}
       </div>
     )
