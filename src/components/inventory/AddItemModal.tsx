@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Modal } from '../ui/Modal'
 import { AddItemForm } from './AddItemForm'
+import { ReceiptScanner } from './ReceiptScanner'
+import { BarcodeScanner } from './BarcodeScanner'
 import { Category, Location, Unit } from '../../types/inventory'
 
 interface AddItemInput {
@@ -58,10 +60,17 @@ export function AddItemModal({ open, onClose, onAdd }: Props) {
     )
   }
 
-  // Receipt scanner (Task 22) and barcode scanner (Task 23) are wired in Chunk 6
+  if (mode === 'receipt') {
+    return (
+      <Modal open={open} onClose={handleClose} title="Scan Receipt">
+        <ReceiptScanner onAdd={onAdd} onDone={handleClose} />
+      </Modal>
+    )
+  }
+
   return (
-    <Modal open={open} onClose={handleClose} title={mode === 'receipt' ? 'Scan Receipt' : 'Scan Barcode'}>
-      <p className="text-gray-500 text-center py-8">Scanner will be wired in Chunk 6</p>
+    <Modal open={open} onClose={handleClose} title="Scan Barcode">
+      <BarcodeScanner onAdd={onAdd} onDone={handleClose} />
     </Modal>
   )
 }
