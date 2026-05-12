@@ -6,6 +6,7 @@ import { DashboardPage } from './pages/DashboardPage'
 import { InventoryPage } from './pages/InventoryPage'
 import { RecipesPage } from './pages/RecipesPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { ToastProvider } from './components/ui/Toast'
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -23,15 +24,17 @@ export default function App() {
   }
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route element={<Layout />}>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/inventory" element={<InventoryPage />} />
-          <Route path="/recipes" element={<RecipesPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <ToastProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/inventory" element={<InventoryPage />} />
+            <Route path="/recipes" element={<RecipesPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </ToastProvider>
   )
 }
