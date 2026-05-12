@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { GroceryItem } from '../types/grocery'
+import type { GroceryItem } from '../types/grocery'
 
 export function useGroceryList() {
   const [items, setItems] = useState<GroceryItem[]>([])

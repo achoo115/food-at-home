@@ -7,7 +7,7 @@ import { RecipeDetail } from '../components/recipes/RecipeDetail'
 import { RecipeList } from '../components/recipes/RecipeList'
 import { AiRecipeChat } from '../components/recipes/AiRecipeChat'
 import { CookModal } from '../components/recipes/CookModal'
-import { SpoonacularDetail } from '../lib/spoonacular'
+import type { SpoonacularDetail } from '../lib/spoonacular'
 
 type Tab = 'search' | 'ai' | 'saved'
 

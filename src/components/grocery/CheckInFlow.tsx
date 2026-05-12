@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Modal } from '../ui/Modal'
-import { GroceryItem } from '../../types/grocery'
-import { Category, Location, Unit } from '../../types/inventory'
+import type { GroceryItem } from '../../types/grocery'
+import type { Category, Location, Unit } from '../../types/inventory'
 
 interface AddItemInput {
   name: string

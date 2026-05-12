@@ -1,4 +1,4 @@
-import { Achievement } from '../../types/gamification'
+import type { Achievement } from '../../types/gamification'
 import { achievementDefinitions } from '../../data/achievements'
 import { BadgeCard } from './BadgeCard'
 

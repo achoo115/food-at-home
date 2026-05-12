@@ -1,5 +1,6 @@
-import { FormEvent, useState } from 'react'
-import { Category, Location, Unit } from '../../types/inventory'
+import { useState } from 'react'
+import type { FormEvent } from 'react'
+import type { Category, Location, Unit } from '../../types/inventory'
 
 interface AddItemInput {
   name: string

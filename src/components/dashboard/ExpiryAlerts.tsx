@@ -1,4 +1,4 @@
-import { InventoryItem } from '../../types/inventory'
+import type { InventoryItem } from '../../types/inventory'
 
 interface Props {
   items: InventoryItem[]

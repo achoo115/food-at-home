@@ -1,5 +1,6 @@
-import { FormEvent, useState } from 'react'
-import { InventoryItem } from '../../types/inventory'
+import { useState } from 'react'
+import type { FormEvent } from 'react'
+import type { InventoryItem } from '../../types/inventory'
 
 interface GeneratedRecipe {
   title: string

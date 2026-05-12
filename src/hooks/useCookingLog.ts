@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { CookingLog } from '../types/gamification'
+import type { CookingLog } from '../types/gamification'
 
 const DEFAULT_TAKEOUT_COST = 18
 

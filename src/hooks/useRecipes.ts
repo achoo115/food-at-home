@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { RecipeWithIngredients } from '../types/recipe'
-import { searchByIngredients, getRecipeDetail, SpoonacularRecipe } from '../lib/spoonacular'
+import type { RecipeWithIngredients } from '../types/recipe'
+import type { SpoonacularRecipe } from '../lib/spoonacular'
+import { searchByIngredients, getRecipeDetail } from '../lib/spoonacular'
 import { generateRecipe } from '../lib/claude'
-import { InventoryItem } from '../types/inventory'
+import type { InventoryItem } from '../types/inventory'
 
 export function useRecipes() {
   const [savedRecipes, setSavedRecipes] = useState<RecipeWithIngredients[]>([])

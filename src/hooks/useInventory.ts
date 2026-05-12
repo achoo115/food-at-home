@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { InventoryItem, Category, Location, Unit, ItemStatus } from '../types/inventory'
+import type { InventoryItem, Category, Location, Unit, ItemStatus } from '../types/inventory'
 import { getShelfLifeDays } from '../data/shelfLife'
 
 interface AddItemInput {

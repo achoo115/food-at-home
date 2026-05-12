@@ -1,5 +1,5 @@
-import { RecipeWithIngredients } from '../../types/recipe'
-import { InventoryItem } from '../../types/inventory'
+import type { RecipeWithIngredients } from '../../types/recipe'
+import type { InventoryItem } from '../../types/inventory'
 import { matchInventoryToRecipe } from '../../lib/ingredientMatcher'
 
 interface Props {

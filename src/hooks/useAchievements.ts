@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { Achievement, AchievementType, CookingLog } from '../types/gamification'
-import { InventoryItem } from '../types/inventory'
+import type { Achievement, AchievementType, CookingLog } from '../types/gamification'
+import type { InventoryItem } from '../types/inventory'
 
 export function useAchievements() {
   const [achievements, setAchievements] = useState<Achievement[]>([])

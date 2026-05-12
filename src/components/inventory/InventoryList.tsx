@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { InventoryItem, Category, Location } from '../../types/inventory'
+import type { InventoryItem, Category, Location } from '../../types/inventory'
 import { InventoryCard } from './InventoryCard'
 
 interface Props {

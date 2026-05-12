@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Category, Location, Unit } from '../../types/inventory'
+import type { Category, Location, Unit } from '../../types/inventory'
 
 interface ScannedItem {
   name: string

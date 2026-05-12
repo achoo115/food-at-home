@@ -1,4 +1,4 @@
-import { SpoonacularRecipe } from '../../lib/spoonacular'
+import type { SpoonacularRecipe } from '../../lib/spoonacular'
 
 interface Props {
   recipe: SpoonacularRecipe

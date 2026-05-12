@@ -1,4 +1,4 @@
-import { AchievementDefinition } from '../../data/achievements'
+import type { AchievementDefinition } from '../../data/achievements'
 
 interface Props {
   definition: AchievementDefinition

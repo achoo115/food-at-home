@@ -1,6 +1,7 @@
-import { FormEvent, useState } from 'react'
+import { useState } from 'react'
+import type { FormEvent } from 'react'
 import { GroceryItemRow } from './GroceryItemRow'
-import { GroceryItem } from '../../types/grocery'
+import type { GroceryItem } from '../../types/grocery'
 
 interface Props {
   uncheckedItems: GroceryItem[]

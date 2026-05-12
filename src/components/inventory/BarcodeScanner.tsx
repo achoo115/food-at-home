@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { lookupBarcode } from '../../lib/openFoodFacts'
 import { AddItemForm } from './AddItemForm'
-import { Category, Location, Unit } from '../../types/inventory'
+import type { Category, Location, Unit } from '../../types/inventory'
 
 interface AddItemInput {
   name: string

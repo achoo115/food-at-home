@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Modal } from '../ui/Modal'
-import { SpoonacularDetail, getRecipeDetail } from '../../lib/spoonacular'
+import type { SpoonacularDetail } from '../../lib/spoonacular'
+import { getRecipeDetail } from '../../lib/spoonacular'
 
 interface Props {
   recipeId: number | null

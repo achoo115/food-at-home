@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef, createContext, useContext, useCallback, ReactNode } from 'react'
+import { useEffect, useState, useRef, createContext, useContext, useCallback } from 'react'
+import type { ReactNode } from 'react'
 
 interface Toast {
   id: number

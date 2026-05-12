@@ -1,4 +1,4 @@
-import { AchievementType } from '../types/gamification'
+import type { AchievementType } from '../types/gamification'
 
 export interface AchievementDefinition {
   type: AchievementType

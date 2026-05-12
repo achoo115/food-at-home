@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Modal } from '../ui/Modal'
-import { InventoryItem } from '../../types/inventory'
+import type { InventoryItem } from '../../types/inventory'
 import { ingredientsMatch } from '../../lib/ingredientMatcher'
 
 interface RecipeIngredient {

@@ -3,7 +3,7 @@ import { Modal } from '../ui/Modal'
 import { AddItemForm } from './AddItemForm'
 import { ReceiptScanner } from './ReceiptScanner'
 import { BarcodeScanner } from './BarcodeScanner'
-import { Category, Location, Unit } from '../../types/inventory'
+import type { Category, Location, Unit } from '../../types/inventory'
 
 interface AddItemInput {
   name: string

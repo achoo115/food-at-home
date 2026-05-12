@@ -1,4 +1,4 @@
-import { GroceryItem } from '../../types/grocery'
+import type { GroceryItem } from '../../types/grocery'
 
 interface Props {
   item: GroceryItem
