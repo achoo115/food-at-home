@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5-20250514',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 2048,
         messages: [{
           role: 'user',
@@ -75,6 +75,21 @@ Only include food items. Skip non-food purchases, taxes, totals, store info, and
 
     let text = result.content?.[0]?.text || '[]'
     text = text.replace(/^```json?\n?/i, '').replace(/\n?```$/i, '').trim()
+
+    // Validate it's actually a JSON array
+    try {
+      const parsed = JSON.parse(text)
+      if (!Array.isArray(parsed)) {
+        return new Response('[]', {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+    } catch {
+      // Claude returned non-JSON text — no items found
+      return new Response('[]', {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
     return new Response(text, {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
