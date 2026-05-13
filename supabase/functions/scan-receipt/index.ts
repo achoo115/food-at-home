@@ -2,18 +2,34 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'authorization, content-type',
-      },
-    })
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const { imageBase64, mediaType } = await req.json()
+    // Accept both JSON (with base64) and raw binary uploads
+    let imageBase64: string
+    let mediaType: string
+
+    const contentType = req.headers.get('content-type') || ''
+
+    if (contentType.includes('application/json')) {
+      const body = await req.json()
+      imageBase64 = body.imageBase64
+      mediaType = body.mediaType || 'image/png'
+    } else {
+      // Binary upload — convert to base64
+      const buffer = await req.arrayBuffer()
+      imageBase64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
+      mediaType = contentType || 'image/png'
+    }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -32,7 +48,7 @@ Deno.serve(async (req) => {
               type: 'image',
               source: {
                 type: 'base64',
-                media_type: mediaType || 'image/png',
+                media_type: mediaType,
                 data: imageBase64,
               },
             },
@@ -53,24 +69,20 @@ Only include food items. Skip non-food purchases, taxes, totals, store info, and
     if (result.error) {
       return new Response(JSON.stringify({ error: result.error.message }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
     let text = result.content?.[0]?.text || '[]'
-    // Strip markdown fences if present
     text = text.replace(/^```json?\n?/i, '').replace(/\n?```$/i, '').trim()
 
     return new Response(text, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 })

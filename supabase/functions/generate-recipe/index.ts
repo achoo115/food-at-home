@@ -2,14 +2,15 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'authorization, content-type',
-      },
-    })
+    return new Response(null, { headers: corsHeaders })
   }
 
   const { ingredients, expiringItems, mood, maxTime, cuisine } = await req.json()
@@ -53,9 +54,6 @@ Return format:
   const text = result.content?.[0]?.text || '{}'
 
   return new Response(text, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-    },
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
 })
