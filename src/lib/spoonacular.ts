@@ -27,6 +27,7 @@ export interface SpoonacularDetail {
 }
 
 export async function searchByIngredients(ingredients: string[], count = 10): Promise<SpoonacularRecipe[]> {
+  if (!API_KEY) throw new Error('Spoonacular API key not configured')
   const params = new URLSearchParams({
     apiKey: API_KEY,
     ingredients: ingredients.join(','),

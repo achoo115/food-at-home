@@ -9,11 +9,11 @@ export function ProfilePage() {
   const { user, signOut } = useAuth()
   const cookingLog = useCookingLog()
   const { achievements } = useAchievements()
-  const { items } = useInventory()
+  const { allItems } = useInventory()
 
   const totalCooked = cookingLog.logs.length
-  const wastedItems = items.filter((i) => i.status === 'expired' || i.status === 'wasted').length
-  const consumedItems = items.filter((i) => i.status === 'consumed').length
+  const wastedItems = allItems.filter((i) => i.status === 'expired' || i.status === 'wasted').length
+  const consumedItems = allItems.filter((i) => i.status === 'consumed').length
   const wasteRate = consumedItems + wastedItems > 0
     ? Math.round((wastedItems / (consumedItems + wastedItems)) * 100)
     : 0

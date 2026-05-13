@@ -3,6 +3,10 @@ import { Modal } from '../ui/Modal'
 import type { SpoonacularDetail } from '../../lib/spoonacular'
 import { getRecipeDetail } from '../../lib/spoonacular'
 
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, '')
+}
+
 interface Props {
   recipeId: number | null
   onClose: () => void
@@ -29,7 +33,7 @@ export function RecipeDetail({ recipeId, onClose, onSave, onCook }: Props) {
         <p className="text-gray-400 text-center py-8">Loading recipe...</p>
       ) : detail ? (
         <div className="space-y-4">
-          <p className="text-sm text-gray-600" dangerouslySetInnerHTML={{ __html: detail.summary }} />
+          <p className="text-sm text-gray-600">{stripHtml(detail.summary)}</p>
           <div className="flex gap-4 text-sm text-gray-500">
             {detail.preparationMinutes > 0 && <span>Prep: {detail.preparationMinutes}m</span>}
             {detail.cookingMinutes > 0 && <span>Cook: {detail.cookingMinutes}m</span>}
@@ -46,7 +50,7 @@ export function RecipeDetail({ recipeId, onClose, onSave, onCook }: Props) {
           {detail.instructions && (
             <div>
               <h3 className="font-semibold mb-2">Instructions</h3>
-              <div className="text-sm text-gray-700" dangerouslySetInnerHTML={{ __html: detail.instructions }} />
+              <p className="text-sm text-gray-700">{stripHtml(detail.instructions)}</p>
             </div>
           )}
           <div className="flex gap-2">

@@ -43,6 +43,7 @@ export function useRecipes() {
     const ingredients = items.map((i) => i.name)
     const expiring = items
       .filter((i) => {
+        if (!i.expiry_date) return false
         const days = Math.ceil((new Date(i.expiry_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
         return days <= 3
       })

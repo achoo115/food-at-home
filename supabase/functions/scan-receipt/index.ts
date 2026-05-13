@@ -26,8 +26,13 @@ Deno.serve(async (req) => {
       mediaType = body.mediaType || 'image/png'
     } else {
       // Binary upload — convert to base64
-      const buffer = await req.arrayBuffer()
-      imageBase64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
+      const buffer = new Uint8Array(await req.arrayBuffer())
+      let binary = ''
+      const chunkSize = 8192
+      for (let i = 0; i < buffer.length; i += chunkSize) {
+        binary += String.fromCharCode(...buffer.subarray(i, i + chunkSize))
+      }
+      imageBase64 = btoa(binary)
       mediaType = contentType || 'image/png'
     }
 

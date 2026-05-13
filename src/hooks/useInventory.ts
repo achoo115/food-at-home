@@ -15,6 +15,7 @@ interface AddItemInput {
 
 export function useInventory() {
   const [items, setItems] = useState<InventoryItem[]>([])
+  const [allItems, setAllItems] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchItems = useCallback(async () => {
@@ -27,7 +28,18 @@ export function useInventory() {
     setLoading(false)
   }, [])
 
-  useEffect(() => { fetchItems() }, [fetchItems])
+  const fetchAllItems = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('inventory_items')
+      .select('*')
+      .order('expiry_date', { ascending: true })
+    if (!error && data) setAllItems(data)
+  }, [])
+
+  useEffect(() => {
+    fetchItems()
+    fetchAllItems()
+  }, [fetchItems, fetchAllItems])
 
   async function addItem(input: AddItemInput) {
     let expiryDate = input.expiry_date
@@ -112,5 +124,5 @@ export function useInventory() {
     return updateItem(id, { quantity: newQty })
   }
 
-  return { items, loading, addItem, updateItem, updateStatus, deleteItem, deductQuantity, refetch: fetchItems }
+  return { items, allItems, loading, addItem, updateItem, updateStatus, deleteItem, deductQuantity, refetch: fetchItems }
 }
