@@ -98,16 +98,23 @@ async function collectRecipeUrls(): Promise<string[]> {
 }
 
 async function main() {
-  console.log('Reading your NYT Recipe Box…')
-  const urls = await collectRecipeUrls()
+  // Preferred path: a list of recipe URLs you collected from the rendered Recipe
+  // Box page with the browser snippet (recipebox-urls.json). Falls back to trying
+  // to scrape the page directly (only works if it's not JavaScript-rendered).
+  const URLS_FILE = process.env.RECIPE_URLS_FILE || 'recipebox-urls.json'
+  let urls: string[]
+  if (existsSync(URLS_FILE)) {
+    urls = JSON.parse(readFileSync(URLS_FILE, 'utf8')).filter((u: unknown) => typeof u === 'string')
+    console.log(`Using ${urls.length} recipe URLs from ${URLS_FILE}.`)
+  } else {
+    console.log('Reading your NYT Recipe Box…')
+    urls = await collectRecipeUrls()
+  }
   if (urls.length === 0) {
     console.error(
-      '\nCouldn\'t find your saved recipes at the known URLs.\n' +
-      'Fix: in a logged-in browser, click "Recipe Box", copy the URL from the address bar,\n' +
-      'and add this line to .env.import.local (then rerun):\n' +
-      '  NYT_RECIPE_BOX_URL=<paste the URL>\n' +
-      'If that still finds 0, the page is JavaScript-rendered — tell Claude and paste the\n' +
-      'Network-tab request (DevTools > Network > XHR) that returns your saved recipes as JSON.\n',
+      '\nNo recipe URLs found. The Recipe Box page is JavaScript-rendered, so run the\n' +
+      'browser snippet Claude gave you on the /recipe-box page to collect your recipe\n' +
+      'URLs, save them as recipebox-urls.json in this folder, and rerun.\n',
     )
     return
   }

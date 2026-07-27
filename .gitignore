@@ -28,3 +28,6 @@ dist-ssr
 
 # Recipe Box import output
 imported-recipes.json
+
+# Recipe Box URL list (personal)
+recipebox-urls.json
