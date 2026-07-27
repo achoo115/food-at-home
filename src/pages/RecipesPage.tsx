@@ -82,6 +82,20 @@ export function RecipesPage() {
           <ThisWeekPlan
             savedRecipes={recipes.savedRecipes}
             inventoryItems={inventoryItems}
+            preferences={preferences}
+            specials={specials}
+            onGenerateForSlot={async ({ constraints, onSaleItems }) => {
+              const gen = await recipes.generateAiRecipe(inventoryItems, { constraints, onSaleItems })
+              const saved = await recipes.saveRecipe({
+                title: gen.title, description: gen.description, instructions: gen.instructions,
+                prep_time: gen.prep_time, cook_time: gen.cook_time, source: 'ai_generated',
+                calories: gen.calories ?? null, protein_g: gen.protein_g ?? null, carbs_g: gen.carbs_g ?? null,
+                fat_g: gen.fat_g ?? null, fiber_g: gen.fiber_g ?? null, build: gen.build ?? null,
+                ingredients: gen.ingredients.map((i) => ({ name: i.name, quantity: i.quantity, unit: i.unit })),
+              })
+              if (!saved) return null
+              return { id: saved.id, title: gen.title, ingredients: gen.ingredients.map((i) => ({ name: i.name })) }
+            }}
             onAddToGrocery={async (names) => { for (const n of names) await grocery.addItem(n) }}
           />
         </div>
