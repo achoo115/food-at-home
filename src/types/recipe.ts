@@ -20,6 +20,7 @@ export interface Recipe {
   last_cooked_at: string | null
   heart_count: number
   image_url: string | null
+  source_url: string | null
   build: { pro?: string[]; base?: string[]; veg?: string[]; engine?: string[] } | null
 }
 

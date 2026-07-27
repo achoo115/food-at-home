@@ -23,6 +23,7 @@ interface Props {
   specials: Special[]
   onGenerateForSlot: (args: { mealType: string; constraints: string[]; onSaleItems: string[] }) => Promise<GeneratedSlotRecipe | null>
   onAddToGrocery: (names: string[]) => Promise<void>
+  onViewRecipe: (recipe: RecipeWithIngredients) => void
 }
 
 function BuildPillars({ build }: { build: RecipeWithIngredients['build'] }) {
@@ -37,7 +38,7 @@ function BuildPillars({ build }: { build: RecipeWithIngredients['build'] }) {
   return <p className="text-xs text-gray-400 mt-1">{parts.join(' · ')}</p>
 }
 
-export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specials, onGenerateForSlot, onAddToGrocery }: Props) {
+export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specials, onGenerateForSlot, onAddToGrocery, onViewRecipe }: Props) {
   const { meals, loading, setSlot, clearSlot } = useMealPlan()
   const [picking, setPicking] = useState<number | null>(null)
   const [listMsg, setListMsg] = useState('')
@@ -162,7 +163,7 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
             ) : meal ? (
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <p className="font-semibold">{meal.recipe.title}</p>
+                  <button onClick={() => onViewRecipe(meal.recipe)} className="font-semibold text-left underline decoration-gray-200">{meal.recipe.title}</button>
                   <MacroBadges macros={meal.recipe} className="mt-1" />
                   <BuildPillars build={meal.recipe.build} />
                 </div>

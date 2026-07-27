@@ -9,6 +9,8 @@ import { RecipeDetail } from '../components/recipes/RecipeDetail'
 import { RecipeList } from '../components/recipes/RecipeList'
 import { AiRecipeChat } from '../components/recipes/AiRecipeChat'
 import { CookModal } from '../components/recipes/CookModal'
+import { SavedRecipeModal } from '../components/recipes/SavedRecipeModal'
+import type { RecipeWithIngredients } from '../types/recipe'
 import { ThisWeekPlan } from '../components/recipes/ThisWeekPlan'
 import { SpecialsCard } from '../components/recipes/SpecialsCard'
 import { RecipeImport } from '../components/recipes/RecipeImport'
@@ -29,6 +31,7 @@ export function RecipesPage() {
   const [tab, setTab] = useState<Tab>('week')
   const [selectedSpoonId, setSelectedSpoonId] = useState<number | null>(null)
   const [cookRecipe, setCookRecipe] = useState<{ id?: string; name: string; ingredients: { name: string; quantity: number; unit: string }[] } | null>(null)
+  const [viewRecipe, setViewRecipe] = useState<RecipeWithIngredients | null>(null)
 
   async function handleSearch() {
     await recipes.searchByInventory(inventoryItems)
@@ -98,6 +101,7 @@ export function RecipesPage() {
               return { id: saved.id, title: gen.title, ingredients: gen.ingredients.map((i) => ({ name: i.name })) }
             }}
             onAddToGrocery={async (names) => { for (const n of names) await grocery.addItem(n) }}
+            onViewRecipe={setViewRecipe}
           />
         </div>
       )}
@@ -181,16 +185,23 @@ export function RecipesPage() {
         <RecipeList
           recipes={recipes.savedRecipes}
           inventoryItems={inventoryItems}
-          onSelect={(r) => {
-            setCookRecipe({
-              id: r.id,
-              name: r.title,
-              ingredients: r.recipe_ingredients.map((i) => ({ name: i.name, quantity: i.quantity, unit: i.unit })),
-            })
-          }}
+          onSelect={(r) => setViewRecipe(r)}
           onToggleFavorite={recipes.toggleFavorite}
         />
       )}
+
+      <SavedRecipeModal
+        recipe={viewRecipe}
+        onClose={() => setViewRecipe(null)}
+        onCook={(r) => {
+          setViewRecipe(null)
+          setCookRecipe({
+            id: r.id,
+            name: r.title,
+            ingredients: r.recipe_ingredients.map((i) => ({ name: i.name, quantity: i.quantity, unit: i.unit })),
+          })
+        }}
+      />
 
       <RecipeDetail
         recipeId={selectedSpoonId}
