@@ -169,3 +169,16 @@ export function parseLdJsonBlocks(blocks: string[]): NormalizedRecipe | null {
 export function parseRecipeJsonLd(html: string): NormalizedRecipe | null {
   return parseLdJsonBlocks(extractLdJsonBlocks(html))
 }
+
+/**
+ * Pull absolute NYT Cooking recipe URLs out of a Recipe Box page's HTML.
+ * Matches `/recipes/<id>-<slug>` links (relative or absolute), dedupes, and
+ * returns canonical `https://cooking.nytimes.com/...` URLs.
+ */
+export function extractRecipeUrls(html: string, origin = 'https://cooking.nytimes.com'): string[] {
+  const seen = new Set<string>()
+  for (const m of html.matchAll(/\/recipes\/(\d+)-[a-z0-9-]+/gi)) {
+    seen.add(origin + m[0])
+  }
+  return [...seen]
+}

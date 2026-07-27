@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseRecipeJsonLd, iso8601ToMinutes, parseNutritionGrams } from './recipeImport'
+import { parseRecipeJsonLd, iso8601ToMinutes, parseNutritionGrams, extractRecipeUrls } from './recipeImport'
 
 const wrap = (jsonld: unknown) =>
   `<html><head><script type="application/ld+json">${JSON.stringify(jsonld)}</script></head><body>page</body></html>`
@@ -89,5 +89,19 @@ describe('parseRecipeJsonLd', () => {
 
   it('skips a Recipe node too sparse to be usable', () => {
     expect(parseRecipeJsonLd(wrap({ '@type': 'Recipe', name: 'Empty' }))).toBeNull()
+  })
+})
+
+describe('extractRecipeUrls', () => {
+  it('extracts, canonicalizes, and dedupes recipe links from Recipe Box HTML', () => {
+    const html = `
+      <a href="/recipes/1018147-cacio-e-pepe">x</a>
+      <a href="/recipes/1018147-cacio-e-pepe">dup</a>
+      <a href="https://cooking.nytimes.com/recipes/1234-sheet-pan-chicken">y</a>
+      <a href="/account">not a recipe</a>`
+    const urls = extractRecipeUrls(html)
+    expect(urls).toContain('https://cooking.nytimes.com/recipes/1018147-cacio-e-pepe')
+    expect(urls).toContain('https://cooking.nytimes.com/recipes/1234-sheet-pan-chicken')
+    expect(urls).toHaveLength(2) // deduped, non-recipe link ignored
   })
 })
