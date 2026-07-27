@@ -136,13 +136,14 @@ export function useRecipes() {
     const recipe = savedRecipes.find((r) => r.id === id)
     if (!recipe) return
 
+    const nowIso = new Date().toISOString()
     await supabase
       .from('recipes')
-      .update({ times_cooked: recipe.times_cooked + 1 })
+      .update({ times_cooked: recipe.times_cooked + 1, last_cooked_at: nowIso })
       .eq('id', id)
 
     setSavedRecipes((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, times_cooked: r.times_cooked + 1 } : r))
+      prev.map((r) => (r.id === id ? { ...r, times_cooked: r.times_cooked + 1, last_cooked_at: nowIso } : r))
     )
   }
 

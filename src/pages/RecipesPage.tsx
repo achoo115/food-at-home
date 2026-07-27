@@ -9,16 +9,19 @@ import { RecipeDetail } from '../components/recipes/RecipeDetail'
 import { RecipeList } from '../components/recipes/RecipeList'
 import { AiRecipeChat } from '../components/recipes/AiRecipeChat'
 import { CookModal } from '../components/recipes/CookModal'
+import { ThisWeekPlan } from '../components/recipes/ThisWeekPlan'
+import { useGroceryList } from '../hooks/useGroceryList'
 import type { SpoonacularDetail } from '../lib/spoonacular'
 
-type Tab = 'search' | 'ai' | 'saved'
+type Tab = 'week' | 'search' | 'ai' | 'saved'
 
 export function RecipesPage() {
   const { items: inventoryItems, deductQuantity } = useInventory()
   const recipes = useRecipes()
   const cookingLog = useCookingLog()
   const { preferences } = usePreferences()
-  const [tab, setTab] = useState<Tab>('search')
+  const grocery = useGroceryList()
+  const [tab, setTab] = useState<Tab>('week')
   const [selectedSpoonId, setSelectedSpoonId] = useState<number | null>(null)
   const [cookRecipe, setCookRecipe] = useState<{ id?: string; name: string; ingredients: { name: string; quantity: number; unit: string }[] } | null>(null)
 
@@ -52,7 +55,8 @@ export function RecipesPage() {
   }
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'search', label: 'What Can I Make?' },
+    { key: 'week', label: 'This Week' },
+    { key: 'search', label: 'Make?' },
     { key: 'ai', label: 'AI Chef' },
     { key: 'saved', label: 'Saved' },
   ]
@@ -66,6 +70,14 @@ export function RecipesPage() {
           </button>
         ))}
       </div>
+
+      {tab === 'week' && (
+        <ThisWeekPlan
+          savedRecipes={recipes.savedRecipes}
+          inventoryItems={inventoryItems}
+          onAddToGrocery={async (names) => { for (const n of names) await grocery.addItem(n) }}
+        />
+      )}
 
       {tab === 'search' && (
         <div className="space-y-4">
