@@ -41,22 +41,38 @@ export function SpecialsScanner({ onScanned, onDone }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
+  async function scanOne(file: File): Promise<ScannedSpecial[]> {
+    try {
+      const { base64, mediaType } = await readFile(file)
+      const { data, error: fnError } = await supabase.functions.invoke('scan-specials', { body: { imageBase64: base64, mediaType } })
+      if (fnError || data?.error || !Array.isArray(data)) return []
+      return data as ScannedSpecial[]
+    } catch {
+      return [] // one bad screenshot never sinks the batch
+    }
+  }
+
   async function handleFiles(files: File[]) {
     setBusy(true)
     setError('')
     try {
-      const all: ScannedSpecial[] = []
-      for (let i = 0; i < files.length; i++) {
-        setStatus(files.length > 1 ? `Reading flyer ${i + 1} of ${files.length}…` : 'Reading the flyer…')
-        const { base64, mediaType } = await readFile(files[i])
-        const { data, error: fnError } = await supabase.functions.invoke('scan-specials', {
-          body: { imageBase64: base64, mediaType },
-        })
-        if (fnError) throw new Error(fnError.message)
-        if (data?.error) throw new Error(data.error)
-        if (Array.isArray(data)) all.push(...(data as ScannedSpecial[]))
+      // Scan pages concurrently (cap 5) so 25 screenshots take seconds, not a minute;
+      // tolerate per-page failures and just merge whatever parsed.
+      const CONCURRENCY = 5
+      const results: ScannedSpecial[][] = new Array(files.length)
+      let done = 0
+      let next = 0
+      const worker = async () => {
+        while (next < files.length) {
+          const i = next++
+          results[i] = await scanOne(files[i])
+          done++
+          setStatus(`Scanned ${done} of ${files.length}…`)
+        }
       }
-      const merged = dedupe(all)
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, files.length) }, worker))
+
+      const merged = dedupe(results.flat())
       if (merged.length === 0) throw new Error('No sale items found in those images.')
       setStatus(`Saving ${merged.length} deals…`)
       await onScanned(merged)
