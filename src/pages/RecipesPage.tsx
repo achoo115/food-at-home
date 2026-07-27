@@ -10,7 +10,9 @@ import { RecipeList } from '../components/recipes/RecipeList'
 import { AiRecipeChat } from '../components/recipes/AiRecipeChat'
 import { CookModal } from '../components/recipes/CookModal'
 import { ThisWeekPlan } from '../components/recipes/ThisWeekPlan'
+import { SpecialsCard } from '../components/recipes/SpecialsCard'
 import { useGroceryList } from '../hooks/useGroceryList'
+import { useSpecials } from '../hooks/useSpecials'
 import type { SpoonacularDetail } from '../lib/spoonacular'
 
 type Tab = 'week' | 'search' | 'ai' | 'saved'
@@ -21,6 +23,7 @@ export function RecipesPage() {
   const cookingLog = useCookingLog()
   const { preferences } = usePreferences()
   const grocery = useGroceryList()
+  const { specials } = useSpecials()
   const [tab, setTab] = useState<Tab>('week')
   const [selectedSpoonId, setSelectedSpoonId] = useState<number | null>(null)
   const [cookRecipe, setCookRecipe] = useState<{ id?: string; name: string; ingredients: { name: string; quantity: number; unit: string }[] } | null>(null)
@@ -72,11 +75,14 @@ export function RecipesPage() {
       </div>
 
       {tab === 'week' && (
-        <ThisWeekPlan
-          savedRecipes={recipes.savedRecipes}
-          inventoryItems={inventoryItems}
-          onAddToGrocery={async (names) => { for (const n of names) await grocery.addItem(n) }}
-        />
+        <div className="space-y-3">
+          <SpecialsCard />
+          <ThisWeekPlan
+            savedRecipes={recipes.savedRecipes}
+            inventoryItems={inventoryItems}
+            onAddToGrocery={async (names) => { for (const n of names) await grocery.addItem(n) }}
+          />
+        </div>
       )}
 
       {tab === 'search' && (
@@ -98,7 +104,8 @@ export function RecipesPage() {
           onGenerate={(items, options) => {
             const recentTitles = recipes.savedRecipes.slice(0, 8).map((r) => r.title)
             const constraints = buildRecipeConstraints(preferences, recentTitles)
-            return recipes.generateAiRecipe(items, { ...options, constraints })
+            const onSaleItems = specials.map((s) => s.item)
+            return recipes.generateAiRecipe(items, { ...options, constraints, onSaleItems })
           }}
           onSave={async (recipe) => {
             await recipes.saveRecipe({
