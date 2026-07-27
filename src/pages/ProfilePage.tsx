@@ -4,6 +4,7 @@ import { useAchievements } from '../hooks/useAchievements'
 import { useInventory } from '../hooks/useInventory'
 import { BadgeGrid } from '../components/gamification/BadgeGrid'
 import { StreakCalendar } from '../components/gamification/StreakCalendar'
+import { PreferencesEditor } from '../components/profile/PreferencesEditor'
 
 export function ProfilePage() {
   const { user, signOut } = useAuth()
@@ -45,6 +46,13 @@ export function ProfilePage() {
       <div>
         <h2 className="font-semibold mb-3">Achievements</h2>
         <BadgeGrid achievements={achievements} />
+      </div>
+
+      <div>
+        <h2 className="font-semibold mb-3">Meal preferences</h2>
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+          <PreferencesEditor />
+        </div>
       </div>
 
       <button onClick={signOut} className="w-full py-2 text-red-500 text-sm">Sign Out</button>

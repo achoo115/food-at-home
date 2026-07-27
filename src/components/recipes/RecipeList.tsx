@@ -1,6 +1,7 @@
 import type { RecipeWithIngredients } from '../../types/recipe'
 import type { InventoryItem } from '../../types/inventory'
 import { matchInventoryToRecipe } from '../../lib/ingredientMatcher'
+import { MacroBadges } from './MacroBadges'
 
 interface Props {
   recipes: RecipeWithIngredients[]
@@ -29,6 +30,7 @@ export function RecipeList({ recipes, inventoryItems, onSelect, onToggleFavorite
               <div className="flex-1">
                 <p className="font-semibold">{recipe.title}</p>
                 <p className="text-xs text-gray-500 mt-1">{recipe.prep_time + recipe.cook_time}m · Cooked {recipe.times_cooked}x</p>
+                <MacroBadges macros={recipe} className="mt-2" />
                 <div className="mt-2">
                   {canMake ? (
                     <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Ready to cook</span>

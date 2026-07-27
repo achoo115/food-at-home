@@ -12,6 +12,14 @@ export interface Recipe {
   external_id: string | null
   is_favorited: boolean
   times_cooked: number
+  calories: number | null
+  protein_g: number | null
+  carbs_g: number | null
+  fat_g: number | null
+  fiber_g: number | null
+  last_cooked_at: string | null
+  heart_count: number
+  build: { pro?: string[]; base?: string[]; veg?: string[]; engine?: string[] } | null
 }
 
 export interface RecipeIngredient {
