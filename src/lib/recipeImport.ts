@@ -116,13 +116,19 @@ function coerceYield(v: unknown): string | null {
 
 const stripTags = (s: string) => s.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
 
-/** Parse a page's HTML into a normalized recipe, or null if no usable Recipe JSON-LD. */
-export function parseRecipeJsonLd(html: string): NormalizedRecipe | null {
-  const blocks = [...html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)]
-  for (const b of blocks) {
+/** Extract the raw JSON-LD script contents from a page's HTML. */
+export function extractLdJsonBlocks(html: string): string[] {
+  return [...html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)]
+    .map((m) => m[1].trim())
+    .filter(Boolean)
+}
+
+/** Parse already-extracted JSON-LD blocks into a normalized recipe, or null. */
+export function parseLdJsonBlocks(blocks: string[]): NormalizedRecipe | null {
+  for (const raw of blocks) {
     let payload: unknown
     try {
-      payload = JSON.parse(b[1].trim())
+      payload = JSON.parse(raw)
     } catch {
       continue
     }
@@ -157,4 +163,9 @@ export function parseRecipeJsonLd(html: string): NormalizedRecipe | null {
     }
   }
   return null
+}
+
+/** Parse a page's HTML into a normalized recipe, or null if no usable Recipe JSON-LD. */
+export function parseRecipeJsonLd(html: string): NormalizedRecipe | null {
+  return parseLdJsonBlocks(extractLdJsonBlocks(html))
 }

@@ -11,11 +11,12 @@ import { AiRecipeChat } from '../components/recipes/AiRecipeChat'
 import { CookModal } from '../components/recipes/CookModal'
 import { ThisWeekPlan } from '../components/recipes/ThisWeekPlan'
 import { SpecialsCard } from '../components/recipes/SpecialsCard'
+import { RecipeImport } from '../components/recipes/RecipeImport'
 import { useGroceryList } from '../hooks/useGroceryList'
 import { useSpecials } from '../hooks/useSpecials'
 import type { SpoonacularDetail } from '../lib/spoonacular'
 
-type Tab = 'week' | 'search' | 'ai' | 'saved'
+type Tab = 'week' | 'import' | 'search' | 'ai' | 'saved'
 
 export function RecipesPage() {
   const { items: inventoryItems, deductQuantity } = useInventory()
@@ -59,6 +60,7 @@ export function RecipesPage() {
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'week', label: 'This Week' },
+    { key: 'import', label: 'Import' },
     { key: 'search', label: 'Make?' },
     { key: 'ai', label: 'AI Chef' },
     { key: 'saved', label: 'Saved' },
@@ -83,6 +85,29 @@ export function RecipesPage() {
             onAddToGrocery={async (names) => { for (const n of names) await grocery.addItem(n) }}
           />
         </div>
+      )}
+
+      {tab === 'import' && (
+        <RecipeImport
+          onSave={async (r) => {
+            await recipes.saveRecipe({
+              title: r.title,
+              description: r.description,
+              instructions: r.instructions,
+              prep_time: r.prep_time,
+              cook_time: r.cook_time,
+              source: 'imported',
+              source_url: r.source_url,
+              calories: r.calories,
+              protein_g: r.protein_g,
+              carbs_g: r.carbs_g,
+              fat_g: r.fat_g,
+              fiber_g: r.fiber_g,
+              build: r.build,
+              ingredients: r.ingredients.map((name) => ({ name, quantity: 1, unit: '' })),
+            })
+          }}
+        />
       )}
 
       {tab === 'search' && (
