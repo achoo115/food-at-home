@@ -48,10 +48,9 @@ const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 // the known candidates.
 const RECIPE_BOX_CANDIDATES = [
   process.env.NYT_RECIPE_BOX_URL,
+  'https://cooking.nytimes.com/recipe-box',
   'https://cooking.nytimes.com/my-saves',
   'https://cooking.nytimes.com/recipes/saved',
-  'https://cooking.nytimes.com/recipe-box',
-  'https://cooking.nytimes.com/recipes/recipe-box',
 ].filter(Boolean) as string[]
 
 const cookie = process.env.NYT_COOKIE
