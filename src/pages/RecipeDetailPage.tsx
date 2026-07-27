@@ -6,6 +6,8 @@ import { useGroceryList } from '../hooks/useGroceryList'
 import { useToast } from '../components/ui/Toast'
 import { MacroBadges } from '../components/recipes/MacroBadges'
 import { splitSteps } from '../lib/recipeSteps'
+import { ingredientTerms } from '../lib/recipeHighlight'
+import { StepText } from '../components/recipes/StepText'
 import { recipeInventoryStatus } from '../lib/recipeFilter'
 import { ingredientsMatch } from '../lib/ingredientMatcher'
 
@@ -27,6 +29,7 @@ export function RecipeDetailPage() {
   const recipe = savedRecipes.find((r) => r.id === id)
   const inventoryNames = useMemo(() => inventoryItems.map((i) => i.name), [inventoryItems])
   const status = useMemo(() => (recipe ? recipeInventoryStatus(recipe, inventoryNames) : null), [recipe, inventoryNames])
+  const terms = useMemo(() => ingredientTerms((recipe?.recipe_ingredients ?? []).map((i) => i.name)), [recipe])
 
   if (loading) return <p className="text-gray-400 text-center py-12">Loading…</p>
   if (!recipe) {
@@ -133,7 +136,7 @@ export function RecipeDetailPage() {
               {steps.map((s, i) => (
                 <li key={i} className="text-sm text-gray-700 flex gap-2">
                   <span className="text-gray-300 font-semibold">{i + 1}</span>
-                  <span>{s}</span>
+                  <span><StepText text={s} terms={terms} /></span>
                 </li>
               ))}
             </ol>

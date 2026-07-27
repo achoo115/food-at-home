@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useRecipes } from '../hooks/useRecipes'
 import { useInventory } from '../hooks/useInventory'
 import { useCookingLog } from '../hooks/useCookingLog'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { CookModal } from '../components/recipes/CookModal'
+import { StepText } from '../components/recipes/StepText'
 import { splitSteps } from '../lib/recipeSteps'
+import { ingredientTerms } from '../lib/recipeHighlight'
 
 // Full-screen, one-step-at-a-time guided cooking. Screen stays awake (the thing
 // NYT's own app lacks). No inventory logic lives here — finishing the last step
@@ -24,6 +26,7 @@ export function CookModePage() {
   const held = useWakeLock(true)
 
   const recipe = savedRecipes.find((r) => r.id === id)
+  const terms = useMemo(() => ingredientTerms((recipe?.recipe_ingredients ?? []).map((i) => i.name)), [recipe])
 
   if (loading) return <div className="fixed inset-0 flex items-center justify-center text-gray-400">Loading…</div>
   if (!recipe) {
@@ -65,7 +68,9 @@ export function CookModePage() {
 
       {/* Current step */}
       <div className="flex-1 overflow-y-auto px-6 flex items-center">
-        <p className="text-2xl leading-relaxed text-gray-900 py-8">{steps[step] || 'No steps for this recipe.'}</p>
+        <p className="text-2xl leading-relaxed text-gray-700 py-8">
+          {steps[step] ? <StepText text={steps[step]} terms={terms} /> : 'No steps for this recipe.'}
+        </p>
       </div>
 
       {/* Controls */}
