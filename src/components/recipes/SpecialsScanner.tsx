@@ -92,7 +92,7 @@ export function SpecialsScanner({ onScanned, onDone }: Props) {
 
   return (
     <div className="space-y-3">
-      <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onPick} />
+      <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={onPick} />
       {busy ? (
         <div className="w-full py-12 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 text-center">
           {status || 'Working…'}
@@ -105,8 +105,12 @@ export function SpecialsScanner({ onScanned, onDone }: Props) {
           </button>
           <button onClick={() => { fileRef.current?.removeAttribute('capture'); fileRef.current?.click() }}
             className="w-full py-6 border-2 border-dashed border-gray-300 rounded-xl text-gray-500">
-            Choose screenshots <span className="text-gray-400 text-sm">(select multiple)</span>
+            Choose screenshots or a PDF <span className="text-gray-400 text-sm">(pick multiple)</span>
           </button>
+          <p className="text-xs text-gray-400 leading-relaxed">
+            Tip: open the deals page in <b>Safari</b>, take a screenshot, tap it, choose <b>Full Page</b> and
+            Save to Files — that grabs the whole list as one PDF. Pick it here instead of 25 screenshots.
+          </p>
           <button onClick={onDone} className="w-full py-2 text-gray-400 text-sm">Cancel</button>
         </>
       )}

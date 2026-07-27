@@ -26,6 +26,9 @@ export function RecipeList({ recipes, inventoryItems, onSelect, onToggleFavorite
 
         return (
           <button key={recipe.id} onClick={() => onSelect(recipe)} className="w-full bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-left">
+            {recipe.image_url && (
+              <img src={recipe.image_url} alt={recipe.title} className="w-full h-32 object-cover rounded-lg mb-3" />
+            )}
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <p className="font-semibold">{recipe.title}</p>

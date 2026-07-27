@@ -46,6 +46,9 @@ export function RecipeImport({ onSave }: Props) {
   if (preview) {
     return (
       <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-3">
+        {preview.image_url && (
+          <img src={preview.image_url} alt={preview.title} className="w-full h-44 object-cover rounded-lg" />
+        )}
         <h3 className="font-bold text-lg">{preview.title}</h3>
         {preview.description && <p className="text-sm text-gray-600">{preview.description}</p>}
         <p className="text-xs text-gray-500">Prep {preview.prep_time}m · Cook {preview.cook_time}m</p>

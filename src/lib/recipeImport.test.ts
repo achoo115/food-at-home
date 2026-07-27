@@ -53,6 +53,17 @@ describe('parseRecipeJsonLd', () => {
     expect(r!.macros).toEqual({ calories: 520, protein_g: 18, carbs_g: 60, fat_g: 22, fiber_g: 3 })
   })
 
+  it('extracts the recipe image from string, array, or ImageObject forms', () => {
+    const s = parseRecipeJsonLd(wrap({ '@type': 'Recipe', name: 'A', recipeIngredient: ['x'], recipeInstructions: 'go', image: 'https://cdn.nyt.com/peach.jpg' }))
+    expect(s!.image_url).toBe('https://cdn.nyt.com/peach.jpg')
+    const arr = parseRecipeJsonLd(wrap({ '@type': 'Recipe', name: 'B', recipeIngredient: ['x'], recipeInstructions: 'go', image: ['https://cdn.nyt.com/1.jpg', 'https://cdn.nyt.com/2.jpg'] }))
+    expect(arr!.image_url).toBe('https://cdn.nyt.com/1.jpg')
+    const obj = parseRecipeJsonLd(wrap({ '@type': 'Recipe', name: 'C', recipeIngredient: ['x'], recipeInstructions: 'go', image: { '@type': 'ImageObject', url: 'https://cdn.nyt.com/obj.jpg' } }))
+    expect(obj!.image_url).toBe('https://cdn.nyt.com/obj.jpg')
+    const none = parseRecipeJsonLd(wrap({ '@type': 'Recipe', name: 'D', recipeIngredient: ['x'], recipeInstructions: 'go' }))
+    expect(none!.image_url).toBeNull()
+  })
+
   it('finds the Recipe inside an @graph and handles @type arrays', () => {
     const r = parseRecipeJsonLd(wrap({
       '@context': 'https://schema.org',

@@ -112,6 +112,7 @@ export function RecipesPage() {
               cook_time: r.cook_time,
               source: 'imported',
               source_url: r.source_url,
+              image_url: r.image_url,
               calories: r.calories,
               protein_g: r.protein_g,
               carbs_g: r.carbs_g,

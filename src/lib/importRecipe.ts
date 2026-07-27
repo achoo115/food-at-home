@@ -16,6 +16,7 @@ export interface ImportedRecipe {
   fiber_g: number | null
   build: { pro?: string[]; base?: string[]; veg?: string[]; engine?: string[] } | null
   source_url: string | null
+  image_url: string | null
 }
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : null)
@@ -25,7 +26,7 @@ function fromNormalized(n: NormalizedRecipe, url: string): ImportedRecipe {
     title: n.title, description: n.description, prep_time: n.prep_time, cook_time: n.cook_time,
     ingredients: n.ingredients, instructions: n.instructions,
     calories: n.macros.calories, protein_g: n.macros.protein_g, carbs_g: n.macros.carbs_g,
-    fat_g: n.macros.fat_g, fiber_g: n.macros.fiber_g, build: null, source_url: url,
+    fat_g: n.macros.fat_g, fiber_g: n.macros.fiber_g, build: null, source_url: url, image_url: n.image_url,
   }
 }
 
@@ -39,6 +40,7 @@ function fromParsed(p: Record<string, unknown>, url: string | null): ImportedRec
     fat_g: num(p.fat_g), fiber_g: num(p.fiber_g),
     build: (p.build && typeof p.build === 'object' ? p.build as ImportedRecipe['build'] : null),
     source_url: url,
+    image_url: null,
   }
 }
 

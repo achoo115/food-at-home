@@ -52,12 +52,16 @@ Rules:
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 2048,
+        max_tokens: 4096,
         system: systemPrompt,
         messages: [{
           role: 'user',
           content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
+            // A full-page iOS screenshot saves as a PDF (one file for the whole
+            // scroll) — send it as a document; regular screenshots as an image.
+            mediaType === 'application/pdf'
+              ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: imageBase64 } }
+              : { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
             { type: 'text', text: 'Extract every item on sale from this flyer as JSON.' },
           ],
         }],

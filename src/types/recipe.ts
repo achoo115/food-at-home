@@ -19,6 +19,7 @@ export interface Recipe {
   fiber_g: number | null
   last_cooked_at: string | null
   heart_count: number
+  image_url: string | null
   build: { pro?: string[]; base?: string[]; veg?: string[]; engine?: string[] } | null
 }
 

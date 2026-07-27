@@ -19,6 +19,7 @@ export interface NormalizedRecipe {
   cook_time: number
   total_time: number
   recipe_yield: string | null
+  image_url: string | null
   macros: ImportedMacros
 }
 
@@ -104,6 +105,23 @@ function extractMacros(nutrition: unknown): ImportedMacros {
   }
 }
 
+// schema.org image: string URL | string[] | ImageObject | ImageObject[]. First usable URL.
+function extractImage(v: unknown): string | null {
+  const pick = (x: unknown): string | null => {
+    if (typeof x === 'string' && /^https?:\/\//i.test(x)) return x
+    if (x && typeof x === 'object') {
+      const u = (x as Json).url
+      if (typeof u === 'string' && /^https?:\/\//i.test(u)) return u
+    }
+    return null
+  }
+  if (Array.isArray(v)) {
+    for (const x of v) { const u = pick(x); if (u) return u }
+    return null
+  }
+  return pick(v)
+}
+
 function coerceYield(v: unknown): string | null {
   if (typeof v === 'string') return v.trim() || null
   if (typeof v === 'number') return String(v)
@@ -159,6 +177,7 @@ export function parseLdJsonBlocks(blocks: string[]): NormalizedRecipe | null {
       cook_time: cook,
       total_time: total || prep + cook,
       recipe_yield: coerceYield(recipe.recipeYield),
+      image_url: extractImage(recipe.image),
       macros: extractMacros(recipe.nutrition),
     }
   }

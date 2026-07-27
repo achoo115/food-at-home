@@ -67,6 +67,7 @@ export function useRecipes() {
     source: 'api' | 'ai_generated' | 'manual' | 'imported'
     external_id?: string
     source_url?: string | null
+    image_url?: string | null
     calories?: number | null
     protein_g?: number | null
     carbs_g?: number | null
@@ -90,6 +91,7 @@ export function useRecipes() {
         source: recipe.source,
         external_id: recipe.external_id ?? null,
         source_url: recipe.source_url ?? null,
+        image_url: recipe.image_url ?? null,
         calories: recipe.calories ?? null,
         protein_g: recipe.protein_g ?? null,
         carbs_g: recipe.carbs_g ?? null,

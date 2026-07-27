@@ -101,6 +101,7 @@ async function main() {
         cook_time: parsed.cook_time,
         source: 'imported',
         source_url: url,
+        image_url: parsed.image_url,
         calories: parsed.macros.calories,
         protein_g: parsed.macros.protein_g,
         carbs_g: parsed.macros.carbs_g,
