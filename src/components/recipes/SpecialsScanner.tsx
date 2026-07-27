@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import type { ChangeEvent } from 'react'
 import { supabase } from '../../lib/supabase'
 import type { ScannedSpecial } from '../../hooks/useSpecials'
 
@@ -7,49 +8,78 @@ interface Props {
   onDone: () => void
 }
 
-// Photograph the weekly flyer / Prime-deals screen; scan-specials (Claude vision)
-// parses it into structured specials. Mirrors ReceiptScanner.
+function readFile(file: File): Promise<{ base64: string; mediaType: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('Could not read file'))
+    reader.onload = () => {
+      const dataUrl = reader.result as string
+      resolve({ base64: dataUrl.split(',')[1], mediaType: dataUrl.split(';')[0].split(':')[1] || 'image/png' })
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
+// Merge specials from several flyer pages, deduping by item name (case-insensitive)
+// and preferring an entry that actually has a sale price.
+function dedupe(items: ScannedSpecial[]): ScannedSpecial[] {
+  const byName = new Map<string, ScannedSpecial>()
+  for (const it of items) {
+    const key = (it.item || '').trim().toLowerCase()
+    if (!key) continue
+    const existing = byName.get(key)
+    if (!existing || (existing.sale_price == null && it.sale_price != null)) byName.set(key, it)
+  }
+  return [...byName.values()]
+}
+
+// Photograph / screenshot the weekly flyer (often several pages) → scan-specials
+// (Claude vision) parses each into structured specials, merged into one list.
 export function SpecialsScanner({ onScanned, onDone }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
-  const [scanning, setScanning] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [status, setStatus] = useState('')
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  async function handleCapture(file: File) {
-    setScanning(true)
+  async function handleFiles(files: File[]) {
+    setBusy(true)
     setError('')
-    const reader = new FileReader()
-    reader.onload = async () => {
-      const dataUrl = reader.result as string
-      const base64 = dataUrl.split(',')[1]
-      const mediaType = dataUrl.split(';')[0].split(':')[1] || 'image/png'
-      try {
+    try {
+      const all: ScannedSpecial[] = []
+      for (let i = 0; i < files.length; i++) {
+        setStatus(files.length > 1 ? `Reading flyer ${i + 1} of ${files.length}…` : 'Reading the flyer…')
+        const { base64, mediaType } = await readFile(files[i])
         const { data, error: fnError } = await supabase.functions.invoke('scan-specials', {
           body: { imageBase64: base64, mediaType },
         })
         if (fnError) throw new Error(fnError.message)
         if (data?.error) throw new Error(data.error)
-        const items = (Array.isArray(data) ? data : []) as ScannedSpecial[]
-        if (items.length === 0) throw new Error('No sale items found in that image.')
-        setSaving(true)
-        await onScanned(items)
-        setSaving(false)
-        onDone()
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Could not read the flyer.')
-        setScanning(false)
+        if (Array.isArray(data)) all.push(...(data as ScannedSpecial[]))
       }
+      const merged = dedupe(all)
+      if (merged.length === 0) throw new Error('No sale items found in those images.')
+      setStatus(`Saving ${merged.length} deals…`)
+      await onScanned(merged)
+      onDone()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not read the flyer.')
+      setBusy(false)
+      setStatus('')
     }
-    reader.readAsDataURL(file)
+  }
+
+  function onPick(e: ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (files && files.length) handleFiles([...files])
+    e.target.value = '' // allow re-picking the same files
   }
 
   return (
     <div className="space-y-3">
-      <input ref={fileRef} type="file" accept="image/*" className="hidden"
-        onChange={(e) => e.target.files?.[0] && handleCapture(e.target.files[0])} />
-      {scanning || saving ? (
+      <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onPick} />
+      {busy ? (
         <div className="w-full py-12 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 text-center">
-          {saving ? 'Saving deals…' : 'Reading the flyer…'}
+          {status || 'Working…'}
         </div>
       ) : (
         <>
@@ -59,7 +89,7 @@ export function SpecialsScanner({ onScanned, onDone }: Props) {
           </button>
           <button onClick={() => { fileRef.current?.removeAttribute('capture'); fileRef.current?.click() }}
             className="w-full py-6 border-2 border-dashed border-gray-300 rounded-xl text-gray-500">
-            Choose a screenshot
+            Choose screenshots <span className="text-gray-400 text-sm">(select multiple)</span>
           </button>
           <button onClick={onDone} className="w-full py-2 text-gray-400 text-sm">Cancel</button>
         </>
