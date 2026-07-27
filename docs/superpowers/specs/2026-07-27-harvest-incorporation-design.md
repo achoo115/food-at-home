@@ -1,6 +1,8 @@
 # Harvest incorporation + Whole Foods specials
 
-Date: 2026-07-27 · Status: approved architecture, phased build
+Date: 2026-07-27 · Status: ALL FIVE PHASES SHIPPED (store-ordered list, macros +
+preferences, AI variety rules, weekly plan + rotation, Whole Foods specials
+capstone). Migrations applied, edge functions deployed, 31 unit tests green.
 
 Bring the strong ideas from the Harvest Trader-Joe's meal planner
 (SGShuman/tjs-meal-planner) into food-at-home, then add a capstone that ingests
