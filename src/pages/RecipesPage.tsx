@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useRecipes } from '../hooks/useRecipes'
 import { useInventory } from '../hooks/useInventory'
 import { useCookingLog } from '../hooks/useCookingLog'
@@ -9,8 +10,7 @@ import { RecipeDetail } from '../components/recipes/RecipeDetail'
 import { RecipeList } from '../components/recipes/RecipeList'
 import { AiRecipeChat } from '../components/recipes/AiRecipeChat'
 import { CookModal } from '../components/recipes/CookModal'
-import { SavedRecipeModal } from '../components/recipes/SavedRecipeModal'
-import type { RecipeWithIngredients } from '../types/recipe'
+import { filterRecipes, applyQuickFilter, type QuickFilter } from '../lib/recipeFilter'
 import { ThisWeekPlan } from '../components/recipes/ThisWeekPlan'
 import { SpecialsCard } from '../components/recipes/SpecialsCard'
 import { RecipeImport } from '../components/recipes/RecipeImport'
@@ -22,6 +22,7 @@ import type { SpoonacularDetail } from '../lib/spoonacular'
 type Tab = 'week' | 'import' | 'search' | 'ai' | 'saved'
 
 export function RecipesPage() {
+  const navigate = useNavigate()
   const { items: inventoryItems, deductQuantity } = useInventory()
   const recipes = useRecipes()
   const cookingLog = useCookingLog()
@@ -31,7 +32,14 @@ export function RecipesPage() {
   const [tab, setTab] = useState<Tab>('week')
   const [selectedSpoonId, setSelectedSpoonId] = useState<number | null>(null)
   const [cookRecipe, setCookRecipe] = useState<{ id?: string; name: string; ingredients: { name: string; quantity: number; unit: string }[] } | null>(null)
-  const [viewRecipe, setViewRecipe] = useState<RecipeWithIngredients | null>(null)
+  const [search, setSearch] = useState('')
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('all')
+
+  const inventoryNames = useMemo(() => inventoryItems.map((i) => i.name), [inventoryItems])
+  const savedFiltered = useMemo(
+    () => applyQuickFilter(filterRecipes(recipes.savedRecipes, search), quickFilter, inventoryNames),
+    [recipes.savedRecipes, search, quickFilter, inventoryNames]
+  )
 
   async function handleSearch() {
     await recipes.searchByInventory(inventoryItems)
@@ -101,7 +109,7 @@ export function RecipesPage() {
               return { id: saved.id, title: gen.title, ingredients: gen.ingredients.map((i) => ({ name: i.name })) }
             }}
             onAddToGrocery={async (names) => { for (const n of names) await grocery.addItem(n) }}
-            onViewRecipe={setViewRecipe}
+            onViewRecipe={(r) => navigate(`/recipes/${r.id}`)}
           />
         </div>
       )}
@@ -182,26 +190,42 @@ export function RecipesPage() {
       )}
 
       {tab === 'saved' && (
-        <RecipeList
-          recipes={recipes.savedRecipes}
-          inventoryItems={inventoryItems}
-          onSelect={(r) => setViewRecipe(r)}
-          onToggleFavorite={recipes.toggleFavorite}
-        />
+        <div className="space-y-3">
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={`Search ${recipes.savedRecipes.length} recipes…`}
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"
+          />
+          <div className="flex gap-2 overflow-x-auto -mx-1 px-1 pb-1">
+            {([
+              { key: 'all', label: 'All' },
+              { key: 'onhand', label: 'On hand' },
+              { key: 'quick', label: 'Under 30 min' },
+              { key: 'protein', label: 'High protein' },
+            ] as { key: QuickFilter; label: string }[]).map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setQuickFilter(f.key)}
+                className={`whitespace-nowrap px-3 py-1.5 rounded-full text-sm font-medium ${quickFilter === f.key ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          {savedFiltered.length === 0 ? (
+            <p className="text-gray-400 text-center py-8">No recipes match.</p>
+          ) : (
+            <RecipeList
+              recipes={savedFiltered}
+              inventoryItems={inventoryItems}
+              onSelect={(r) => navigate(`/recipes/${r.id}`)}
+              onToggleFavorite={recipes.toggleFavorite}
+            />
+          )}
+        </div>
       )}
-
-      <SavedRecipeModal
-        recipe={viewRecipe}
-        onClose={() => setViewRecipe(null)}
-        onCook={(r) => {
-          setViewRecipe(null)
-          setCookRecipe({
-            id: r.id,
-            name: r.title,
-            ingredients: r.recipe_ingredients.map((i) => ({ name: i.name, quantity: i.quantity, unit: i.unit })),
-          })
-        }}
-      />
 
       <RecipeDetail
         recipeId={selectedSpoonId}

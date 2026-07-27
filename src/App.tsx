@@ -5,6 +5,8 @@ import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { InventoryPage } from './pages/InventoryPage'
 import { RecipesPage } from './pages/RecipesPage'
+import { RecipeDetailPage } from './pages/RecipeDetailPage'
+import { CookModePage } from './pages/CookModePage'
 import { ProfilePage } from './pages/ProfilePage'
 import { ToastProvider } from './components/ui/Toast'
 
@@ -31,8 +33,11 @@ export default function App() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/inventory" element={<InventoryPage />} />
             <Route path="/recipes" element={<RecipesPage />} />
+            <Route path="/recipes/:id" element={<RecipeDetailPage />} />
             <Route path="/profile" element={<ProfilePage />} />
           </Route>
+          {/* Cook Mode is full-screen — outside Layout so there's no bottom nav */}
+          <Route path="/recipes/:id/cook" element={<CookModePage />} />
         </Routes>
       </BrowserRouter>
     </ToastProvider>

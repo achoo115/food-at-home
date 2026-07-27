@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "import:recipebox": "tsx scripts/importRecipeBox.ts"
+    "import:recipebox": "tsx scripts/importRecipeBox.ts",
+    "backfill:steps": "tsx scripts/backfillSteps.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",
