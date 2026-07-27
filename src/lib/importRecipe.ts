@@ -62,6 +62,14 @@ export async function importFromText(text: string, url: string | null = null): P
   return fromParsed(data, url)
 }
 
+/** Download a source image into our Storage bucket, returning the permanent public
+ *  URL — or null if the source can't be fetched (caller keeps the original link). */
+export async function persistImage(sourceUrl: string): Promise<string | null> {
+  const { data, error } = await supabase.functions.invoke('save-image', { body: { url: sourceUrl } })
+  if (error || !data || data.error || !data.url) return null
+  return data.url as string
+}
+
 /** Fallback: parse a screenshot of a recipe via the LLM (vision). */
 export async function importFromImage(imageBase64: string, mediaType: string): Promise<ImportedRecipe> {
   const { data, error } = await supabase.functions.invoke('parse-recipe', { body: { imageBase64, mediaType } })

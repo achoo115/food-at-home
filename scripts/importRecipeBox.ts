@@ -25,6 +25,7 @@
  *   SUPABASE_URL, SUPABASE_SERVICE_KEY, APP_USER_ID  (optional) direct insert
  */
 import { writeFileSync, readFileSync, existsSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { extractRecipeUrls, extractLdJsonBlocks, parseLdJsonBlocks } from '../src/lib/recipeImport.ts'
 
 // Load .env.import.local (Supabase creds staged for you + your NYT_COOKIE line)
@@ -122,9 +123,25 @@ async function main() {
   if (SUPABASE_URL && SUPABASE_SERVICE_KEY && APP_USER_ID) {
     const { createClient } = await import('@supabase/supabase-js')
     const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }
+    // Download the recipe photo (from THIS machine — your IP + cookie, so NYT's CDN
+    // serves it) and store a permanent copy; keep the source link on failure.
+    async function saveImage(sourceUrl: string): Promise<string> {
+      try {
+        const res = await fetch(sourceUrl, { headers: { 'User-Agent': UA, Cookie: cookie!, Accept: 'image/*' } })
+        const ct = (res.headers.get('content-type') || '').split(';')[0].toLowerCase()
+        if (!res.ok || !ct.startsWith('image/')) return sourceUrl
+        const bytes = new Uint8Array(await res.arrayBuffer())
+        const path = createHash('sha256').update(sourceUrl).digest('hex').slice(0, 16) + '.' + (EXT[ct] || 'jpg')
+        const { error } = await db.storage.from('recipe-images').upload(path, bytes, { contentType: ct, upsert: true })
+        if (error) return sourceUrl
+        return db.storage.from('recipe-images').getPublicUrl(path).data.publicUrl
+      } catch { return sourceUrl }
+    }
     let inserted = 0
     for (const r of recipes) {
       const { ingredients, ...rest } = r as { ingredients: string[] } & Record<string, unknown>
+      if (rest.image_url) rest.image_url = await saveImage(rest.image_url as string)
       // Dedupe on (user, source_url): delete any existing then insert fresh.
       await db.from('recipes').delete().eq('user_id', APP_USER_ID).eq('source_url', rest.source_url as string)
       const { data, error } = await db.from('recipes').insert({ ...rest, user_id: APP_USER_ID }).select('id').single()

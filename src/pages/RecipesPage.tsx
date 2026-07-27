@@ -12,6 +12,7 @@ import { CookModal } from '../components/recipes/CookModal'
 import { ThisWeekPlan } from '../components/recipes/ThisWeekPlan'
 import { SpecialsCard } from '../components/recipes/SpecialsCard'
 import { RecipeImport } from '../components/recipes/RecipeImport'
+import { persistImage } from '../lib/importRecipe'
 import { useGroceryList } from '../hooks/useGroceryList'
 import { useSpecials } from '../hooks/useSpecials'
 import type { SpoonacularDetail } from '../lib/spoonacular'
@@ -104,6 +105,9 @@ export function RecipesPage() {
       {tab === 'import' && (
         <RecipeImport
           onSave={async (r) => {
+            // Save a permanent copy of the photo; fall back to the source link if
+            // the image host can't be fetched.
+            const storedImage = r.image_url ? (await persistImage(r.image_url)) ?? r.image_url : null
             await recipes.saveRecipe({
               title: r.title,
               description: r.description,
@@ -112,7 +116,7 @@ export function RecipesPage() {
               cook_time: r.cook_time,
               source: 'imported',
               source_url: r.source_url,
-              image_url: r.image_url,
+              image_url: storedImage,
               calories: r.calories,
               protein_g: r.protein_g,
               carbs_g: r.carbs_g,
