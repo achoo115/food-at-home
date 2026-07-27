@@ -14,9 +14,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { ingredients, expiringItems, mood, maxTime, cuisine } = await req.json()
+    const { ingredients, expiringItems, mood, maxTime, cuisine, constraints, onSaleItems } = await req.json()
 
-    const systemPrompt = `You are a helpful home cooking assistant. Generate a recipe based on the user's available ingredients. Prioritize ingredients that are expiring soon. Return JSON only, no markdown.
+    const systemPrompt = `You are a helpful home cooking assistant. Generate a recipe based on the user's available ingredients. Prioritize ingredients that are expiring soon, and prefer items that are on sale when provided. Follow ALL constraints exactly. Return JSON only, no markdown.
 
 Return format:
 {
@@ -25,16 +25,27 @@ Return format:
   "prep_time": 10,
   "cook_time": 20,
   "instructions": "Step-by-step instructions as a single string with numbered steps",
+  "calories": 520,
+  "protein_g": 35,
+  "carbs_g": 40,
+  "fat_g": 18,
+  "fiber_g": 9,
+  "build": { "pro": ["..."], "base": ["..."], "veg": ["..."], "engine": ["..."] },
   "ingredients": [
     { "name": "ingredient", "quantity": 1, "unit": "cup", "base_ingredient": "normalized name" }
   ]
-}`
+}
+Macros are realistic per-serving integers (fiber_g always included). "build" is the 4-pillar breakdown: pro=protein, base=complex carb, veg=vegetable, engine=signature flavor.`
 
     let userPrompt = `Available ingredients: ${ingredients.join(', ')}`
     if (expiringItems?.length) userPrompt += `\n\nExpiring soon (prioritize these!): ${expiringItems.join(', ')}`
+    if (onSaleItems?.length) userPrompt += `\n\nOn sale this week (prefer these): ${onSaleItems.join(', ')}`
     if (mood) userPrompt += `\n\nMood/craving: ${mood}`
     if (maxTime) userPrompt += `\n\nMax total time: ${maxTime} minutes`
     if (cuisine) userPrompt += `\n\nCuisine preference: ${cuisine}`
+    if (Array.isArray(constraints) && constraints.length) {
+      userPrompt += `\n\nConstraints (follow all):\n${constraints.map((c: string) => `- ${c}`).join('\n')}`
+    }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -45,7 +56,7 @@ Return format:
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
+        max_tokens: 1536,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
       }),

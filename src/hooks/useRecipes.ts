@@ -38,7 +38,7 @@ export function useRecipes() {
 
   async function generateAiRecipe(
     items: InventoryItem[],
-    options: { mood?: string; maxTime?: number; cuisine?: string } = {}
+    options: { mood?: string; maxTime?: number; cuisine?: string; constraints?: string[]; onSaleItems?: string[] } = {}
   ) {
     const ingredients = items.map((i) => i.name)
     const expiring = items
@@ -66,6 +66,12 @@ export function useRecipes() {
     cook_time: number
     source: 'api' | 'ai_generated' | 'manual'
     external_id?: string
+    calories?: number | null
+    protein_g?: number | null
+    carbs_g?: number | null
+    fat_g?: number | null
+    fiber_g?: number | null
+    build?: { pro?: string[]; base?: string[]; veg?: string[]; engine?: string[] } | null
     ingredients: { name: string; quantity: number; unit: string; is_optional?: boolean }[]
   }) {
     const { data: { user } } = await supabase.auth.getUser()
@@ -82,6 +88,12 @@ export function useRecipes() {
         cook_time: recipe.cook_time,
         source: recipe.source,
         external_id: recipe.external_id ?? null,
+        calories: recipe.calories ?? null,
+        protein_g: recipe.protein_g ?? null,
+        carbs_g: recipe.carbs_g ?? null,
+        fat_g: recipe.fat_g ?? null,
+        fiber_g: recipe.fiber_g ?? null,
+        build: recipe.build ?? null,
       })
       .select()
       .single()

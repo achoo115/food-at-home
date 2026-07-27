@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useRecipes } from '../hooks/useRecipes'
 import { useInventory } from '../hooks/useInventory'
 import { useCookingLog } from '../hooks/useCookingLog'
+import { usePreferences } from '../hooks/usePreferences'
+import { buildRecipeConstraints } from '../lib/mealRules'
 import { RecipeCard } from '../components/recipes/RecipeCard'
 import { RecipeDetail } from '../components/recipes/RecipeDetail'
 import { RecipeList } from '../components/recipes/RecipeList'
@@ -15,6 +17,7 @@ export function RecipesPage() {
   const { items: inventoryItems, deductQuantity } = useInventory()
   const recipes = useRecipes()
   const cookingLog = useCookingLog()
+  const { preferences } = usePreferences()
   const [tab, setTab] = useState<Tab>('search')
   const [selectedSpoonId, setSelectedSpoonId] = useState<number | null>(null)
   const [cookRecipe, setCookRecipe] = useState<{ id?: string; name: string; ingredients: { name: string; quantity: number; unit: string }[] } | null>(null)
@@ -80,7 +83,11 @@ export function RecipesPage() {
       {tab === 'ai' && (
         <AiRecipeChat
           inventoryItems={inventoryItems}
-          onGenerate={recipes.generateAiRecipe}
+          onGenerate={(items, options) => {
+            const recentTitles = recipes.savedRecipes.slice(0, 8).map((r) => r.title)
+            const constraints = buildRecipeConstraints(preferences, recentTitles)
+            return recipes.generateAiRecipe(items, { ...options, constraints })
+          }}
           onSave={async (recipe) => {
             await recipes.saveRecipe({
               title: recipe.title,
@@ -89,6 +96,12 @@ export function RecipesPage() {
               prep_time: recipe.prep_time,
               cook_time: recipe.cook_time,
               source: 'ai_generated',
+              calories: recipe.calories ?? null,
+              protein_g: recipe.protein_g ?? null,
+              carbs_g: recipe.carbs_g ?? null,
+              fat_g: recipe.fat_g ?? null,
+              fiber_g: recipe.fiber_g ?? null,
+              build: recipe.build ?? null,
               ingredients: recipe.ingredients.map((i) => ({ name: i.name, quantity: i.quantity, unit: i.unit })),
             })
           }}

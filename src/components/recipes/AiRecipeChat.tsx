@@ -1,15 +1,8 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import type { InventoryItem } from '../../types/inventory'
-
-interface GeneratedRecipe {
-  title: string
-  description: string
-  prep_time: number
-  cook_time: number
-  instructions: string
-  ingredients: { name: string; quantity: number; unit: string; base_ingredient: string }[]
-}
+import type { GeneratedRecipe } from '../../lib/claude'
+import { MacroBadges } from './MacroBadges'
 
 interface Props {
   inventoryItems: InventoryItem[]
@@ -62,6 +55,7 @@ export function AiRecipeChat({ inventoryItems, onGenerate, onSave, onCook }: Pro
           <h3 className="font-bold text-lg">{result.title}</h3>
           <p className="text-sm text-gray-600">{result.description}</p>
           <p className="text-xs text-gray-500">Prep: {result.prep_time}m · Cook: {result.cook_time}m</p>
+          <MacroBadges macros={result} />
           <div>
             <h4 className="font-semibold text-sm mb-1">Ingredients</h4>
             <ul className="text-sm text-gray-700 space-y-0.5">
