@@ -24,8 +24,22 @@
  *   OUTPUT               (default imported-recipes.json)
  *   SUPABASE_URL, SUPABASE_SERVICE_KEY, APP_USER_ID  (optional) direct insert
  */
-import { writeFileSync } from 'node:fs'
+import { writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { extractRecipeUrls, extractLdJsonBlocks, parseLdJsonBlocks } from '../src/lib/recipeImport.ts'
+
+// Load .env.import.local (Supabase creds staged for you + your NYT_COOKIE line)
+// without a dependency. Existing shell env wins.
+if (existsSync('.env.import.local')) {
+  for (const line of readFileSync('.env.import.local', 'utf8').split('\n')) {
+    const t = line.trim()
+    if (!t || t.startsWith('#')) continue
+    const eq = t.indexOf('=')
+    if (eq < 0) continue
+    const k = t.slice(0, eq).trim()
+    const v = t.slice(eq + 1).trim()
+    if (!(k in process.env)) process.env[k] = v
+  }
+}
 
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'
 const RECIPE_BOX = 'https://cooking.nytimes.com/recipes/recipe-box'
