@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { GroceryItemRow } from './GroceryItemRow'
 import type { GroceryItem } from '../../types/grocery'
+import { groupByStoreOrder } from '../../lib/storeOrder'
 
 interface Props {
   uncheckedItems: GroceryItem[]
@@ -41,8 +42,13 @@ export function GroceryList({ uncheckedItems, checkedItems, onAdd, onToggle, onD
         <p className="text-gray-400 text-center py-8">Your shopping list is empty</p>
       )}
 
-      {uncheckedItems.map((item) => (
-        <GroceryItemRow key={item.id} item={item} onToggle={onToggle} onDelete={onDelete} />
+      {groupByStoreOrder(uncheckedItems, (i) => i.name).map((group) => (
+        <div key={group.zone}>
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mt-3 mb-1">{group.zone}</p>
+          {group.items.map((item) => (
+            <GroceryItemRow key={item.id} item={item} onToggle={onToggle} onDelete={onDelete} />
+          ))}
+        </div>
       ))}
 
       {checkedItems.length > 0 && (
