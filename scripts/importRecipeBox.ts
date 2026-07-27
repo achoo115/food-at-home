@@ -43,7 +43,16 @@ if (existsSync('.env.import.local')) {
 }
 
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'
-const RECIPE_BOX = 'https://cooking.nytimes.com/recipes/recipe-box'
+// NYT has moved this path around. Set NYT_RECIPE_BOX_URL in .env.import.local to
+// the exact URL your browser shows when you click "Recipe Box"; otherwise we try
+// the known candidates.
+const RECIPE_BOX_CANDIDATES = [
+  process.env.NYT_RECIPE_BOX_URL,
+  'https://cooking.nytimes.com/my-saves',
+  'https://cooking.nytimes.com/recipes/saved',
+  'https://cooking.nytimes.com/recipe-box',
+  'https://cooking.nytimes.com/recipes/recipe-box',
+].filter(Boolean) as string[]
 
 const cookie = process.env.NYT_COOKIE
 if (!cookie) {
@@ -61,22 +70,29 @@ async function fetchHtml(url: string): Promise<string> {
   return res.text()
 }
 
+// Find the Recipe Box URL that actually returns saved-recipe links, then paginate it.
 async function collectRecipeUrls(): Promise<string[]> {
+  let base: string | null = null
+  for (const cand of RECIPE_BOX_CANDIDATES) {
+    try {
+      const html = await fetchHtml(cand)
+      const links = extractRecipeUrls(html)
+      console.log(`  ${cand} → ${links.length} recipe links`)
+      if (links.length > 0) { base = cand; break }
+    } catch (e) {
+      console.log(`  ${cand} → ${(e as Error).message}`)
+    }
+  }
+  if (!base) return []
   const all = new Set<string>()
   for (let page = 1; page <= MAX_PAGES; page++) {
-    const url = page === 1 ? RECIPE_BOX : `${RECIPE_BOX}?page=${page}`
+    const url = page === 1 ? base : `${base}${base.includes('?') ? '&' : '?'}page=${page}`
     let html: string
-    try {
-      html = await fetchHtml(url)
-    } catch (e) {
-      console.warn(`  page ${page}: ${(e as Error).message} — stopping pagination`)
-      break
-    }
+    try { html = await fetchHtml(url) } catch { break }
     const before = all.size
     for (const u of extractRecipeUrls(html)) all.add(u)
-    const added = all.size - before
-    console.log(`  page ${page}: +${added} recipes (total ${all.size})`)
-    if (added === 0) break // no new recipes → end of box
+    if (all.size === before) break // no new recipes → end of box
+    console.log(`  page ${page}: total ${all.size}`)
     await sleep(600)
   }
   return [...all]
@@ -85,6 +101,17 @@ async function collectRecipeUrls(): Promise<string[]> {
 async function main() {
   console.log('Reading your NYT Recipe Box…')
   const urls = await collectRecipeUrls()
+  if (urls.length === 0) {
+    console.error(
+      '\nCouldn\'t find your saved recipes at the known URLs.\n' +
+      'Fix: in a logged-in browser, click "Recipe Box", copy the URL from the address bar,\n' +
+      'and add this line to .env.import.local (then rerun):\n' +
+      '  NYT_RECIPE_BOX_URL=<paste the URL>\n' +
+      'If that still finds 0, the page is JavaScript-rendered — tell Claude and paste the\n' +
+      'Network-tab request (DevTools > Network > XHR) that returns your saved recipes as JSON.\n',
+    )
+    return
+  }
   console.log(`Found ${urls.length} saved recipes. Fetching + parsing…`)
 
   const recipes: Record<string, unknown>[] = []
