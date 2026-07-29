@@ -4,6 +4,7 @@ import type { RecipeWithIngredients } from '../types/recipe'
 import type { SpoonacularRecipe } from '../lib/spoonacular'
 import { searchByIngredients, getRecipeDetail } from '../lib/spoonacular'
 import { generateRecipe } from '../lib/claude'
+import { estimateEconomics } from '../lib/recipeEconomics'
 import type { InventoryItem } from '../types/inventory'
 
 export function useRecipes() {
@@ -151,9 +152,47 @@ export function useRecipes() {
     )
   }
 
+  // Fill + cache servings and cost_per_serving on a recipe the first time it is
+  // needed (e.g. when it enters a plan). Cache hit returns immediately. On any
+  // failure, returns the current (possibly null) values without throwing.
+  async function ensureEconomics(recipe: RecipeWithIngredients) {
+    if (recipe.cost_per_serving != null && recipe.servings != null) {
+      return { servings: recipe.servings, cost_per_serving: recipe.cost_per_serving }
+    }
+    try {
+      const econ = await estimateEconomics({
+        title: recipe.title,
+        ingredients: (recipe.recipe_ingredients ?? []).map((i) => ({ name: i.name, quantity: i.quantity, unit: i.unit })),
+        servings: recipe.servings ?? undefined,
+      })
+      const nowIso = new Date().toISOString()
+      await supabase.from('recipes').update({
+        servings: econ.servings, cost_per_serving: econ.cost_per_serving, cost_estimated_at: nowIso,
+      }).eq('id', recipe.id)
+      setSavedRecipes((prev) => prev.map((r) => r.id === recipe.id
+        ? { ...r, servings: econ.servings, cost_per_serving: econ.cost_per_serving, cost_estimated_at: nowIso } : r))
+      return { servings: econ.servings, cost_per_serving: econ.cost_per_serving }
+    } catch (e) {
+      console.error('ensureEconomics failed:', e)
+      return { servings: recipe.servings, cost_per_serving: recipe.cost_per_serving }
+    }
+  }
+
+  // Manual servings edit: rescale the cached per-serving cost from the implied
+  // total (cost_per_serving * old_servings) so no extra API call is needed.
+  async function setServings(recipeId: string, servings: number) {
+    const recipe = savedRecipes.find((r) => r.id === recipeId)
+    if (!recipe || servings <= 0) return
+    const newCps = recipe.cost_per_serving != null && recipe.servings
+      ? Math.round((recipe.cost_per_serving * recipe.servings / servings) * 100) / 100
+      : recipe.cost_per_serving
+    await supabase.from('recipes').update({ servings, cost_per_serving: newCps }).eq('id', recipeId)
+    setSavedRecipes((prev) => prev.map((r) => r.id === recipeId ? { ...r, servings, cost_per_serving: newCps } : r))
+  }
+
   return {
     savedRecipes, searchResults, loading, searching,
     searchByInventory, generateAiRecipe, saveRecipe,
-    toggleFavorite, incrementCookCount, getRecipeDetail, refetch: fetchSaved,
+    toggleFavorite, incrementCookCount, getRecipeDetail, ensureEconomics, setServings, refetch: fetchSaved,
   }
 }

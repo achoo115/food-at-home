@@ -108,7 +108,8 @@ export function RecipesPage() {
               if (!saved) return null
               return { id: saved.id, title: gen.title, ingredients: gen.ingredients.map((i) => ({ name: i.name })) }
             }}
-            onAddToGrocery={async (names) => { for (const n of names) await grocery.addItem(n) }}
+            onEnsureEconomics={(r) => recipes.ensureEconomics(r)}
+            onAddToGrocery={async (items) => { for (const it of items) await grocery.addItem(it.name, it.quantity, it.unit) }}
             onViewRecipe={(r) => navigate(`/recipes/${r.id}`)}
           />
         </div>
