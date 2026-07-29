@@ -71,8 +71,14 @@ Rules:
     }
 
     const s = servings && servings > 0 ? servings : parsed.servings
-    const perServing = Math.round((parsed.cost_total / s) * 100) / 100
-    return new Response(JSON.stringify({ servings: s, cost_total: parsed.cost_total, cost_per_serving: perServing }), {
+    if (!(s > 0)) {
+      return new Response(JSON.stringify({ error: 'Model returned an invalid servings count' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    const costTotal = Math.round(parsed.cost_total * 100) / 100
+    const perServing = Math.round((costTotal / s) * 100) / 100
+    return new Response(JSON.stringify({ servings: s, cost_total: costTotal, cost_per_serving: perServing }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
