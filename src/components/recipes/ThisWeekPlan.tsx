@@ -2,7 +2,9 @@ import { useRef, useState } from 'react'
 import { useMealPlan } from '../../hooks/useMealPlan'
 import { MEAL_SLOTS, rankForRotation } from '../../lib/mealPlan'
 import { slotConstraints, violatesHardNo, planSavings, countMealsUsingDeals, mainProtein } from '../../lib/weekPlanner'
-import { matchInventoryToRecipe } from '../../lib/ingredientMatcher'
+import { pickWeekFromArchive } from '../../lib/archivePlanner'
+import { consolidatePlan } from '../../lib/groceryConsolidation'
+import { PlanShoppingPreview } from './PlanShoppingPreview'
 import { MacroBadges } from './MacroBadges'
 import type { RecipeWithIngredients } from '../../types/recipe'
 import type { InventoryItem } from '../../types/inventory'
@@ -22,7 +24,8 @@ interface Props {
   preferences: Preferences
   specials: Special[]
   onGenerateForSlot: (args: { mealType: string; constraints: string[]; onSaleItems: string[] }) => Promise<GeneratedSlotRecipe | null>
-  onAddToGrocery: (names: string[]) => Promise<void>
+  onEnsureEconomics: (recipe: RecipeWithIngredients) => Promise<{ servings: number | null; cost_per_serving: number | null }>
+  onAddToGrocery: (items: { name: string; quantity: number; unit: string }[]) => Promise<void>
   onViewRecipe: (recipe: RecipeWithIngredients) => void
 }
 
@@ -38,7 +41,7 @@ function BuildPillars({ build }: { build: RecipeWithIngredients['build'] }) {
   return <p className="text-xs text-gray-400 mt-1">{parts.join(' · ')}</p>
 }
 
-export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specials, onGenerateForSlot, onAddToGrocery, onViewRecipe }: Props) {
+export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specials, onGenerateForSlot, onEnsureEconomics, onAddToGrocery, onViewRecipe }: Props) {
   const { meals, loading, setSlot, clearSlot } = useMealPlan()
   const [picking, setPicking] = useState<number | null>(null)
   const [listMsg, setListMsg] = useState('')
@@ -48,6 +51,48 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
   const [summary, setSummary] = useState<{ deals: number; savings: number } | null>(null)
   const [planNote, setPlanNote] = useState('')
   const cancelRef = useRef(false)
+
+  const [costByRecipe, setCostByRecipe] = useState<Record<string, number | null>>({})
+  const [preview, setPreview] = useState<{ toBuy: ReturnType<typeof consolidatePlan>['toBuy']; onHand: { name: string }[] } | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [archiveNote, setArchiveNote] = useState('')
+
+  async function planFromArchive() {
+    if (filledCount > 0 && !window.confirm('Replace this week’s planned meals with picks from your saved recipes?')) return
+    setSummary(null); setArchiveNote(''); setListMsg('')
+    const { picks, unfilledSlots } = pickWeekFromArchive(savedRecipes, preferences, MEAL_SLOTS)
+    // clear slots we won't fill so a re-plan doesn't leave stale meals
+    for (const i of unfilledSlots) await clearSlot(i)
+    for (const p of picks) await setSlot(p.recipe.id, MEAL_SLOTS[p.slotIndex].meal_type, p.slotIndex)
+    if (unfilledSlots.length) {
+      const labels = unfilledSlots.map((i) => MEAL_SLOTS[i].label.toLowerCase()).join(', ')
+      setArchiveNote(`Couldn’t fill ${labels} from your saved recipes — add one manually or import more.`)
+    }
+    // fire cost estimates in the background; update as they resolve
+    for (const p of picks) {
+      onEnsureEconomics(p.recipe).then((e) => setCostByRecipe((prev) => ({ ...prev, [p.recipe.id]: e.cost_per_serving })))
+    }
+  }
+
+  function costFor(recipeId: string, fallback: number | null): number | null {
+    return recipeId in costByRecipe ? costByRecipe[recipeId] : fallback
+  }
+
+  const weekCost = meals.reduce((sum, m) => sum + (costFor(m.recipe.id, m.recipe.cost_per_serving) ?? 0), 0)
+
+  async function openPreview() {
+    const { toBuy, onHand } = consolidatePlan(meals.map((m) => ({ title: m.recipe.title, recipe_ingredients: m.recipe.recipe_ingredients ?? [] })), inventoryNames)
+    setPreview({ toBuy, onHand })
+  }
+
+  async function confirmAddToList() {
+    if (!preview) return
+    setAdding(true)
+    await onAddToGrocery(preview.toBuy.map((i) => ({ name: i.name, quantity: i.quantity, unit: i.unit })))
+    setAdding(false)
+    setPreview(null)
+    setListMsg(`Added ${preview.toBuy.length} item${preview.toBuy.length !== 1 ? 's' : ''} to your shopping list`)
+  }
 
   const ranked = rankForRotation(savedRecipes)
   const inventoryNames = inventoryItems.map((i) => i.name)
@@ -116,22 +161,20 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
     setSwapping(null)
   }
 
-  async function buildShoppingList() {
-    const missing = new Set<string>()
-    for (const m of meals) {
-      const res = matchInventoryToRecipe(inventoryNames, (m.recipe.recipe_ingredients ?? []).map((i) => i.name))
-      res.missing.forEach((n) => missing.add(n))
-    }
-    const names = [...missing]
-    if (names.length === 0) { setListMsg('Everything for this week is already in your kitchen 🎉'); return }
-    await onAddToGrocery(names)
-    setListMsg(`Added ${names.length} item${names.length > 1 ? 's' : ''} to your shopping list`)
-  }
-
   if (loading) return <p className="text-gray-400 text-center py-8">Loading this week…</p>
 
   return (
     <div className="space-y-3">
+      {!planning && (
+        <button onClick={planFromArchive} className="w-full py-3 bg-green-700 text-white rounded-xl font-semibold shadow-sm">
+          {filledCount > 0 ? 'Replan from my recipes' : 'Plan from my recipes'}
+          <span className="block text-xs font-normal text-green-100 mt-0.5">Picks from your {savedRecipes.length} saved recipes</span>
+        </button>
+      )}
+      {archiveNote && <p className="text-sm text-center text-amber-600">{archiveNote}</p>}
+      {weekCost > 0 && (
+        <p className="text-sm text-center text-gray-500">≈ ${weekCost.toFixed(2)} for the week · one serving of each meal</p>
+      )}
       {/* Auto-plan control */}
       {planning ? (
         <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center justify-between">
@@ -165,6 +208,12 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
                 <div className="flex-1">
                   <button onClick={() => onViewRecipe(meal.recipe)} className="font-semibold text-left underline decoration-gray-200">{meal.recipe.title}</button>
                   <MacroBadges macros={meal.recipe} className="mt-1" />
+                  {(() => {
+                    const cps = costFor(meal.recipe.id, meal.recipe.cost_per_serving)
+                    return cps != null
+                      ? <p className="text-xs text-gray-400 mt-1">~${cps.toFixed(2)}/serving</p>
+                      : (meal.recipe.id in costByRecipe ? null : <p className="text-xs text-gray-300 mt-1">estimating cost…</p>)
+                  })()}
                   <BuildPillars build={meal.recipe.build} />
                 </div>
                 <div className="flex flex-col items-end gap-2 ml-2">
@@ -192,10 +241,20 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
       })}
 
       {meals.length > 0 && !planning && (
-        <div className="pt-2">
-          <button onClick={buildShoppingList} className="w-full py-2 bg-gray-100 text-gray-700 rounded-lg font-semibold">
-            Build shopping list from plan
-          </button>
+        <div className="pt-2 space-y-2">
+          {preview ? (
+            <PlanShoppingPreview
+              toBuy={preview.toBuy}
+              onHand={preview.onHand}
+              onAdd={confirmAddToList}
+              onCancel={() => setPreview(null)}
+              adding={adding}
+            />
+          ) : (
+            <button onClick={openPreview} className="w-full py-2 bg-gray-100 text-gray-700 rounded-lg font-semibold">
+              Build shopping list from plan
+            </button>
+          )}
           {listMsg && <p className="text-sm text-gray-500 text-center mt-2">{listMsg}</p>}
         </div>
       )}
