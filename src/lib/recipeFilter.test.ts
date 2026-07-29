@@ -9,6 +9,7 @@ function recipe(over: Partial<RecipeWithIngredients> & { title: string; ingredie
     external_id: null, is_favorited: false, times_cooked: 0,
     calories: null, protein_g: over.protein_g ?? null, carbs_g: null, fat_g: null, fiber_g: null,
     last_cooked_at: null, heart_count: 0, image_url: null, source_url: null, steps: null, build: null,
+    servings: null, cost_per_serving: null, cost_estimated_at: null,
     recipe_ingredients: over.ingredients.map((name, i) => ({
       id: `${over.title}-${i}`, recipe_id: over.title, name, quantity: 1, unit: '', is_optional: false,
     })),

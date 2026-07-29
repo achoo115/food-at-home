@@ -23,6 +23,9 @@ export interface Recipe {
   source_url: string | null
   steps: string[] | null
   build: { pro?: string[]; base?: string[]; veg?: string[]; engine?: string[] } | null
+  servings: number | null
+  cost_per_serving: number | null
+  cost_estimated_at: string | null
 }
 
 export interface RecipeIngredient {
