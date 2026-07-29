@@ -17,7 +17,7 @@ import { ingredientsMatch } from '../lib/ingredientMatcher'
 export function RecipeDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { savedRecipes, loading } = useRecipes()
+  const { savedRecipes, loading, setServings } = useRecipes()
   const { items: inventoryItems } = useInventory()
   const grocery = useGroceryList()
   const { showToast } = useToast()
@@ -72,6 +72,23 @@ export function RecipeDetailPage() {
         {recipe.times_cooked > 0 ? ` · Cooked ${recipe.times_cooked}×` : ''}
       </p>
       <MacroBadges macros={recipe} className="mt-2" />
+
+      <div className="flex items-center gap-3 mt-2 text-sm text-gray-600">
+        <label className="flex items-center gap-1">
+          Serves
+          <input
+            type="number"
+            min={1}
+            defaultValue={recipe.servings ?? ''}
+            onBlur={(e) => { const v = parseInt(e.target.value, 10); if (v > 0 && v !== recipe.servings) setServings(recipe.id, v) }}
+            className="w-14 px-2 py-1 rounded border border-gray-200"
+            placeholder="?"
+          />
+        </label>
+        {recipe.cost_per_serving != null && (
+          <span className="text-gray-500">~${recipe.cost_per_serving.toFixed(2)}/serving</span>
+        )}
+      </div>
 
       {status && status.total > 0 && (
         <p className={`text-sm mt-3 font-medium ${status.ready ? 'text-green-600' : 'text-gray-600'}`}>
