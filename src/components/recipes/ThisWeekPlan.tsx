@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMealPlan } from '../../hooks/useMealPlan'
 import { MEAL_SLOTS, rankForRotation } from '../../lib/mealPlan'
 import { slotConstraints, violatesHardNo, planSavings, countMealsUsingDeals, mainProtein } from '../../lib/weekPlanner'
@@ -53,6 +53,7 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
   const cancelRef = useRef(false)
 
   const [costByRecipe, setCostByRecipe] = useState<Record<string, number | null>>({})
+  const attemptedEconRef = useRef<Set<string>>(new Set())
   const [preview, setPreview] = useState<{ toBuy: ReturnType<typeof consolidatePlan>['toBuy']; onHand: { name: string }[] } | null>(null)
   const [adding, setAdding] = useState(false)
   const [archiveNote, setArchiveNote] = useState('')
@@ -67,10 +68,6 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
     if (unfilledSlots.length) {
       const labels = unfilledSlots.map((i) => MEAL_SLOTS[i].label.toLowerCase()).join(', ')
       setArchiveNote(`Couldn’t fill ${labels} from your saved recipes — add one manually or import more.`)
-    }
-    // fire cost estimates in the background; update as they resolve
-    for (const p of picks) {
-      onEnsureEconomics(p.recipe).then((e) => setCostByRecipe((prev) => ({ ...prev, [p.recipe.id]: e.cost_per_serving })))
     }
   }
 
@@ -148,6 +145,19 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
     if (failures) setPlanNote(`Couldn’t plan ${failures} slot${failures > 1 ? 's' : ''} — tap Swap to try again.`)
   }
 
+  // Fill in cost/serving for any planned meal still missing it — covers manual
+  // adds, deals-generated meals, and meals loaded from a prior session. Deduped
+  // via a ref so a failed (null) estimate is not retried every render.
+  useEffect(() => {
+    for (const m of meals) {
+      if (m.recipe.cost_per_serving != null) continue
+      if (attemptedEconRef.current.has(m.recipe.id)) continue
+      attemptedEconRef.current.add(m.recipe.id)
+      onEnsureEconomics(m.recipe).then((e) =>
+        setCostByRecipe((prev) => ({ ...prev, [m.recipe.id]: e.cost_per_serving })))
+    }
+  }, [meals, onEnsureEconomics])
+
   async function swapSlot(i: number) {
     setSwapping(i); setSummary(null)
     const others = meals.filter((m) => m.slot_order !== i)
@@ -210,9 +220,9 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
                   <MacroBadges macros={meal.recipe} className="mt-1" />
                   {(() => {
                     const cps = costFor(meal.recipe.id, meal.recipe.cost_per_serving)
-                    return cps != null
-                      ? <p className="text-xs text-gray-400 mt-1">~${cps.toFixed(2)}/serving</p>
-                      : (meal.recipe.id in costByRecipe ? null : <p className="text-xs text-gray-300 mt-1">estimating cost…</p>)
+                    if (cps != null) return <p className="text-xs text-gray-400 mt-1">~${cps.toFixed(2)}/serving</p>
+                    if (meal.recipe.id in costByRecipe) return <p className="text-xs text-gray-300 mt-1">—</p>
+                    return <p className="text-xs text-gray-300 mt-1">estimating cost…</p>
                   })()}
                   <BuildPillars build={meal.recipe.build} />
                 </div>
