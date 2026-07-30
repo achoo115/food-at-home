@@ -5,6 +5,7 @@ import type { SpoonacularRecipe } from '../lib/spoonacular'
 import { searchByIngredients, getRecipeDetail } from '../lib/spoonacular'
 import { generateRecipe } from '../lib/claude'
 import { estimateEconomics } from '../lib/recipeEconomics'
+import { daysUntilExpiry } from '../lib/expiry'
 import type { InventoryItem } from '../types/inventory'
 
 export function useRecipes() {
@@ -44,9 +45,8 @@ export function useRecipes() {
     const ingredients = items.map((i) => i.name)
     const expiring = items
       .filter((i) => {
-        if (!i.expiry_date) return false
-        const days = Math.ceil((new Date(i.expiry_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-        return days <= 3
+        const days = daysUntilExpiry(i.expiry_date, Date.now())
+        return days !== null && days <= 3
       })
       .map((i) => i.name)
 

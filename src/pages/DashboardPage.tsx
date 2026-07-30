@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import { useInventory } from '../hooks/useInventory'
 import { useCookingLog } from '../hooks/useCookingLog'
+import { useToday } from '../hooks/useToday'
+import { daysUntilExpiry } from '../lib/expiry'
 import { ExpiryAlerts } from '../components/dashboard/ExpiryAlerts'
 import { StreakDisplay } from '../components/dashboard/StreakDisplay'
 import { SavingsSnapshot } from '../components/dashboard/SavingsSnapshot'
@@ -10,12 +12,12 @@ export function DashboardPage() {
   const { items } = useInventory()
   const cookingLog = useCookingLog()
   const navigate = useNavigate()
+  const today = useToday()
 
   const expiringItems = items.filter((i) => {
-    const days = Math.ceil(
-      (new Date(i.expiry_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-    )
-    return i.status === 'active' && days <= 3
+    if (i.status !== 'active') return false
+    const days = daysUntilExpiry(i.expiry_date, today)
+    return days !== null && days <= 3
   })
 
   return (

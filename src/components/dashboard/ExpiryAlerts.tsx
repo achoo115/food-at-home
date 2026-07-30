@@ -1,20 +1,18 @@
 import type { InventoryItem } from '../../types/inventory'
+import { useToday } from '../../hooks/useToday'
+import { daysUntilExpiry } from '../../lib/expiry'
 
 interface Props {
   items: InventoryItem[]
 }
 
-function daysUntil(date: string): number {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  return Math.ceil((new Date(date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-}
-
 export function ExpiryAlerts({ items }: Props) {
+  const today = useToday()
+
   const urgent = items
     .filter((i) => i.status === 'active')
-    .map((i) => ({ ...i, daysLeft: daysUntil(i.expiry_date) }))
-    .filter((i) => i.daysLeft <= 3)
+    .map((i) => ({ ...i, daysLeft: daysUntilExpiry(i.expiry_date, today) }))
+    .filter((i): i is InventoryItem & { daysLeft: number } => i.daysLeft !== null && i.daysLeft <= 3)
     .sort((a, b) => a.daysLeft - b.daysLeft)
 
   if (urgent.length === 0) {
