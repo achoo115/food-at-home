@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { filterRecipes, recipeInventoryStatus, applyQuickFilter } from './recipeFilter'
+import { filterRecipes, parseQuery, termMatches, recipeInventoryStatus, applyQuickFilter } from './recipeFilter'
 import type { RecipeWithIngredients } from '../types/recipe'
 
 function recipe(over: Partial<RecipeWithIngredients> & { title: string; ingredients: string[] }): RecipeWithIngredients {
@@ -27,6 +27,95 @@ describe('filterRecipes', () => {
     expect(filterRecipes([pasta, chicken], 'roast').map((r) => r.title)).toEqual(['Roast Chicken'])
   })
   it('matches on ingredient', () => {
+    expect(filterRecipes([pasta, chicken], 'garlic').map((r) => r.title)).toEqual(['Garlic Pasta'])
+  })
+})
+
+describe('multi-ingredient search', () => {
+  // Real NYT-shaped ingredient lines, per the brief's data fact.
+  const leekRecipe = recipe({
+    title: 'Winter Soup',
+    ingredients: ['2 leeks, trimmed, cleaned and julienned', '1 tablespoon unsalted butter, cubed'],
+  })
+  const russetRecipe = recipe({
+    title: 'Creamy Mash',
+    ingredients: ['1 pound russet potatoes', '1 cup heavy cream'],
+  })
+
+  it('parseQuery: drops empty terms from doubled/trailing commas', () => {
+    expect(parseQuery('leek,,potato,')).toEqual({ include: ['leek', 'potato'], exclude: [] })
+  })
+
+  it('parseQuery: trims, lowercases, collapses whitespace, splits -terms to exclude, drops bare "-"', () => {
+    expect(parseQuery(' Leek , -Cilantro , - , sweet   potato ')).toEqual({
+      include: ['leek', 'sweet potato'],
+      exclude: ['cilantro'],
+    })
+  })
+
+  it('parseQuery: empty string is both empty', () => {
+    expect(parseQuery('')).toEqual({ include: [], exclude: [] })
+  })
+
+  it('termMatches: false positives on compound words', () => {
+    expect(termMatches('corn', '2 teaspoons whole black peppercorns (optional)')).toBe(false)
+    expect(termMatches('corn', '2 teaspoons cornstarch')).toBe(false)
+    expect(termMatches('salt', '1 tablespoon unsalted butter, cubed')).toBe(false)
+    expect(termMatches('egg', '2 ounces finely grated Parmigiano-Reggiano')).toBe(false)
+    expect(termMatches('egg', '1 small eggplant, sliced diagonally ½-inch thick')).toBe(false)
+    expect(termMatches('oil', '4 cups boiling water')).toBe(false)
+  })
+
+  it('termMatches: true positives incl. plural/phrase/hyphen', () => {
+    expect(termMatches('corn', '6 cups fresh corn kernels (from 6 to 7 ears fresh corn)')).toBe(true)
+    expect(termMatches('leek', '2 leeks, trimmed, cleaned and julienned')).toBe(true)
+    expect(termMatches('egg', '1 large egg')).toBe(true)
+    expect(termMatches('egg', '4 large eggs')).toBe(true)
+    expect(termMatches('tomato', '6 cups canned crushed tomatoes')).toBe(true)
+    expect(termMatches('sweet potato', '2 sweet potatoes, peeled')).toBe(true)
+    expect(termMatches('potato', '2 sweet potatoes, peeled')).toBe(true)
+    expect(termMatches('red pepper', '½ teaspoon red-pepper flakes')).toBe(true)
+    expect(termMatches('sweet potato', '1 pound russet potatoes')).toBe(false)
+  })
+
+  it('termMatches: accepted limitation — "nut" does not match "walnuts" (compound words; do not "fix" into matching nutmeg)', () => {
+    expect(termMatches('nut', '¾ cup chopped walnuts')).toBe(false)
+  })
+
+  it('filterRecipes: all vs any across two real-shaped recipes', () => {
+    expect(filterRecipes([leekRecipe, russetRecipe], 'leek, potato', 'all')).toEqual([])
+    expect(filterRecipes([leekRecipe, russetRecipe], 'leek, potato', 'any')).toEqual([leekRecipe, russetRecipe])
+    expect(filterRecipes([leekRecipe, russetRecipe], 'leek, potato, -cream', 'any')).toEqual([leekRecipe])
+  })
+
+  it('exclusion scope: drops by ingredient, by title, and does not parse "or" alternatives (documented)', () => {
+    const cilantroIngredient = recipe({
+      title: 'Corn Salad',
+      ingredients: ['3 tablespoons chopped fresh cilantro (optional)'],
+    })
+    const cilantroTitle = recipe({ title: 'Cilantro-Lime Chicken', ingredients: ['2 limes, juiced'] })
+    const cilantroOr = recipe({
+      title: 'Grain Bowl',
+      ingredients: ['basil or cilantro leaves, for serving'],
+    })
+    const clean = recipe({ title: 'Plain Rice', ingredients: ['2 cups rice'] })
+
+    expect(filterRecipes([cilantroIngredient, cilantroTitle, cilantroOr, clean], '-cilantro', 'any')).toEqual([clean])
+  })
+
+  it('title match: term hits a recipe via title even when no ingredient line says it', () => {
+    const roastChicken = recipe({ title: 'Roast Chicken', ingredients: ['salt', 'thyme'] })
+    const pastaOnly = recipe({ title: 'Garlic Pasta', ingredients: ['pasta', 'garlic'] })
+    expect(filterRecipes([pastaOnly, roastChicken], 'chicken').map((r) => r.title)).toEqual(['Roast Chicken'])
+  })
+
+  it('default mode is "all"', () => {
+    expect(filterRecipes([leekRecipe, russetRecipe], 'leek, potato')).toEqual(
+      filterRecipes([leekRecipe, russetRecipe], 'leek, potato', 'all')
+    )
+  })
+
+  it('single term still works on the existing bare-token fixture', () => {
     expect(filterRecipes([pasta, chicken], 'garlic').map((r) => r.title)).toEqual(['Garlic Pasta'])
   })
 })
