@@ -57,8 +57,15 @@ describe('multi-ingredient search', () => {
     expect(parseQuery('')).toEqual({ include: [], exclude: [] })
   })
 
+  it('parseQuery: strips ALL leading dashes on an exclude term', () => {
+    expect(parseQuery('--cilantro')).toEqual({ include: [], exclude: ['cilantro'] })
+  })
+
+  it('parseQuery: dedupes include and exclude, keeping the first occurrence', () => {
+    expect(parseQuery('Leek, leek, -Cream, -cream')).toEqual({ include: ['leek'], exclude: ['cream'] })
+  })
+
   it('termMatches: false positives on compound words', () => {
-    expect(termMatches('corn', '2 teaspoons whole black peppercorns (optional)')).toBe(false)
     expect(termMatches('corn', '2 teaspoons cornstarch')).toBe(false)
     expect(termMatches('salt', '1 tablespoon unsalted butter, cubed')).toBe(false)
     expect(termMatches('egg', '2 ounces finely grated Parmigiano-Reggiano')).toBe(false)
@@ -78,8 +85,17 @@ describe('multi-ingredient search', () => {
     expect(termMatches('sweet potato', '1 pound russet potatoes')).toBe(false)
   })
 
-  it('termMatches: accepted limitation — "nut" does not match "walnuts" (compound words; do not "fix" into matching nutmeg)', () => {
-    expect(termMatches('nut', '¾ cup chopped walnuts')).toBe(false)
+  it('termMatches: whole-word rule allows a letter prefix (walnuts, strawberries, chickpeas) but excludes a different word that merely starts the same (peanut butter, peaches)', () => {
+    expect(termMatches('nut', '¾ cup chopped walnuts')).toBe(true)
+    expect(termMatches('nut', '1 cup roasted peanuts')).toBe(true)
+    expect(termMatches('berry', '1 pound strawberries, hulled')).toBe(true)
+    expect(termMatches('pea', '1 (15-ounce) can chickpeas, drained')).toBe(true)
+    expect(termMatches('pea', '1 cup creamy peanut butter')).toBe(false)
+    expect(termMatches('pea', '2 ripe peaches')).toBe(false)
+  })
+
+  it('termMatches: accepted limitation — "corn" matches "peppercorns" (measured 2026-10-17 — the price of matching walnuts/strawberries; do not "fix" by forbidding letter prefixes)', () => {
+    expect(termMatches('corn', '2 teaspoons whole black peppercorns (optional)')).toBe(true)
   })
 
   it('filterRecipes: all vs any across two real-shaped recipes', () => {
