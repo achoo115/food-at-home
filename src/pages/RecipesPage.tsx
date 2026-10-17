@@ -10,7 +10,7 @@ import { RecipeDetail } from '../components/recipes/RecipeDetail'
 import { RecipeList } from '../components/recipes/RecipeList'
 import { AiRecipeChat } from '../components/recipes/AiRecipeChat'
 import { CookModal } from '../components/recipes/CookModal'
-import { filterRecipes, applyQuickFilter, type QuickFilter } from '../lib/recipeFilter'
+import { filterRecipes, applyQuickFilter, parseQuery, type QuickFilter, type MatchMode } from '../lib/recipeFilter'
 import { ThisWeekPlan } from '../components/recipes/ThisWeekPlan'
 import { SpecialsCard } from '../components/recipes/SpecialsCard'
 import { RecipeImport } from '../components/recipes/RecipeImport'
@@ -34,11 +34,13 @@ export function RecipesPage() {
   const [cookRecipe, setCookRecipe] = useState<{ id?: string; name: string; ingredients: { name: string; quantity: number; unit: string }[] } | null>(null)
   const [search, setSearch] = useState('')
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all')
+  const [matchMode, setMatchMode] = useState<MatchMode>('all')
 
   const inventoryNames = useMemo(() => inventoryItems.map((i) => i.name), [inventoryItems])
+  const parsedSearch = useMemo(() => parseQuery(search), [search])
   const savedFiltered = useMemo(
-    () => applyQuickFilter(filterRecipes(recipes.savedRecipes, search), quickFilter, inventoryNames),
-    [recipes.savedRecipes, search, quickFilter, inventoryNames]
+    () => applyQuickFilter(filterRecipes(recipes.savedRecipes, search, matchMode), quickFilter, inventoryNames),
+    [recipes.savedRecipes, search, matchMode, quickFilter, inventoryNames]
   )
 
   async function handleSearch() {
@@ -196,9 +198,28 @@ export function RecipesPage() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={`Search ${recipes.savedRecipes.length} recipes…`}
+            placeholder="leek, potato, -cilantro"
             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"
           />
+          <p className="text-xs text-gray-400 px-1">
+            {savedFiltered.length} of {recipes.savedRecipes.length} recipes
+          </p>
+          {parsedSearch.include.length >= 2 && (
+            <div className="flex items-center gap-2 px-1">
+              <span className="text-xs text-gray-400">Match</span>
+              {(['all', 'any'] as MatchMode[]).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  aria-pressed={matchMode === m}
+                  onClick={() => setMatchMode(m)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium ${matchMode === m ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+                >
+                  {m === 'all' ? 'All' : 'Any'}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex gap-2 overflow-x-auto -mx-1 px-1 pb-1">
             {([
               { key: 'all', label: 'All' },
@@ -215,7 +236,18 @@ export function RecipesPage() {
               </button>
             ))}
           </div>
-          {savedFiltered.length === 0 ? (
+          {savedFiltered.length === 0 && parsedSearch.include.length >= 2 && matchMode === 'all' ? (
+            <div className="text-gray-400 text-center py-8 space-y-2">
+              <p>No recipe has all of these.</p>
+              <button
+                type="button"
+                onClick={() => setMatchMode('any')}
+                className="text-sm font-medium text-green-700 underline"
+              >
+                Show recipes with any of them
+              </button>
+            </div>
+          ) : savedFiltered.length === 0 ? (
             <p className="text-gray-400 text-center py-8">No recipes match.</p>
           ) : (
             <RecipeList
