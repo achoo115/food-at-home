@@ -42,13 +42,17 @@ export function ReceiptScanner({ onAdd, onDone, onBusy }: Props) {
 
   const busy = phase.kind === 'preparing' || phase.kind === 'scanning' || phase.kind === 'saving'
   useEffect(() => { onBusy?.(busy) }, [busy, onBusy])
-  useEffect(() => () => { images.forEach((i) => URL.revokeObjectURL(i.previewUrl)); abortRef.current?.abort() }, [images])
+  // Revoke previews when the set changes or on unmount. The abort lives in its
+  // OWN mount-only effect: setImages() commits while the scan is in flight, and
+  // a cleanup keyed on [images] would abort the request it just started.
+  useEffect(() => () => { images.forEach((i) => URL.revokeObjectURL(i.previewUrl)) }, [images])
+  useEffect(() => () => { abortRef.current?.abort() }, [])
 
-  async function handleFiles(list: FileList | null) {
-    const files = Array.from(list ?? []).slice(0, MAX_IMAGES)
+  async function handleFiles(all: File[]) {
+    const files = all.slice(0, MAX_IMAGES)
     if (files.length === 0) return
     setError('')
-    setNote(list && list.length > MAX_IMAGES ? `Only the first ${MAX_IMAGES} photos were used.` : '')
+    setNote(all.length > MAX_IMAGES ? `Only the first ${MAX_IMAGES} photos were used.` : '')
 
     // One at a time: a 12 MP decode is ~49 MB; several at once jettisons the PWA.
     const prepared: PreparedImage[] = []
@@ -156,9 +160,9 @@ export function ReceiptScanner({ onAdd, onDone, onBusy }: Props) {
     return (
       <div className="space-y-3">
         <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden"
-          onChange={(e) => { const f = e.target.files; e.target.value = ''; handleFiles(f) }} />
+          onChange={(e) => { const f = Array.from(e.target.files ?? []); e.target.value = ''; handleFiles(f) }} />
         <input ref={libraryRef} type="file" accept="image/*" multiple className="hidden"
-          onChange={(e) => { const f = e.target.files; e.target.value = ''; handleFiles(f) }} />
+          onChange={(e) => { const f = Array.from(e.target.files ?? []); e.target.value = ''; handleFiles(f) }} />
         <button onClick={() => cameraRef.current?.click()} className="w-full py-6 border-2 border-dashed border-gray-300 rounded-xl text-gray-500">
           Take a photo
         </button>

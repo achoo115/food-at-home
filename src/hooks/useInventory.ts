@@ -54,11 +54,11 @@ export function useInventory() {
     let expiryDate = input.expiry_date
     let estimatedExpiry = false
 
+    const container = input.container ?? inferContainer(input.name)
     if (!expiryDate) {
-      expiryDate = dateAfterDays(getShelfLifeDays(input.name, input.location))
+      expiryDate = dateAfterDays(getShelfLifeDays(input.name, input.location, container))
       estimatedExpiry = true
     }
-    const container = input.container ?? inferContainer(input.name)
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return

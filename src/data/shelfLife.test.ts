@@ -105,6 +105,7 @@ describe('getOpenedShelfLifeDays', () => {
     ['Graza Drizzle Extra Virgin Olive Oil (squeeze bottle)', 180],
     ['Cooking white wine (bottle)', 5],
     ['Japanese curry roux (box)', 90],
+    ['Microwaveable cooked jasmine rice (bowl)', 90],
   ])('%s opened → %i days', (name, expected) => {
     expect(getOpenedShelfLifeDays(name, 'fridge')).toBe(expected)
   })
@@ -112,5 +113,37 @@ describe('getOpenedShelfLifeDays', () => {
   it('never extends fresh food past its table value', () => {
     expect(getOpenedShelfLifeDays('spinach', 'fridge')).toBe(5)
     expect(getOpenedShelfLifeDays('unknown thing', 'pantry')).toBe(30)
+  })
+
+  it('clamps to the fallback when the table is LONGER (eggs 35, cheese 21 → 7 opened)', () => {
+    // Auditor mutation 2026-10-31: dropping the Math.min left every case green because
+    // spinach (5) sits under the 7-day fallback. These sit above it.
+    expect(getOpenedShelfLifeDays('eggs', 'fridge')).toBe(7)
+    expect(getOpenedShelfLifeDays('cheddar cheese', 'fridge')).toBe(7)
+    expect(getOpenedShelfLifeDays('carrots', 'fridge')).toBe(7)
+  })
+
+  it.each([
+    ['hard boiled eggs', 7],      // "boiled" is not "oil"
+    ['goats cheese', 7],          // "goats" is not "oats"
+    ['rice pudding', 7],          // a bare 'rice' must not make pudding a 90-day dry good
+    ['sugar snap peas', 7],
+    ['flour tortillas', 7],
+    ['turmoil hot sauce', 365],   // "hot sauce" is a real word match; "turmoil" is not "oil" but hot sauce wins anyway
+  ])('opened-day regexes are word-bounded: %s → %i', (name, expected) => {
+    expect(getOpenedShelfLifeDays(name, 'fridge')).toBeLessThanOrEqual(Math.max(expected, 7))
+    if (expected > 7) expect(getOpenedShelfLifeDays(name, 'fridge')).toBe(expected)
+  })
+})
+
+describe('getShelfLifeDays — container hint from a scan', () => {
+  it('a sealed hint extends a pantry date when the name does not reveal the packaging', () => {
+    expect(getShelfLifeDays('Mystery Brand Tomatoes', 'pantry')).toBe(5)
+    expect(getShelfLifeDays('Mystery Brand Tomatoes', 'pantry', 'can')).toBe(540)
+    expect(getShelfLifeDays('Mystery Brand Tomatoes', 'pantry', 'other')).toBe(5)
+  })
+  it('a hint never overrides the refrigerate-only guard or the fridge table', () => {
+    expect(getShelfLifeDays('kimchi', 'pantry', 'jar')).toBeLessThanOrEqual(7)
+    expect(getShelfLifeDays('Mystery Brand Tomatoes', 'fridge', 'can')).toBe(7)
   })
 })

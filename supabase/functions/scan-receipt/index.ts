@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 8192,
-        system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
+        system: SYSTEM, // ~700 tokens: below the cacheable minimum, so no cache_control
         tools: [TOOL],
         tool_choice: { type: 'tool', name: 'record_items' },
         messages: [{ role: 'user', content }],

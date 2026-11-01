@@ -1,5 +1,5 @@
 import { termMatches } from '../lib/recipeFilter'
-import { inferContainer, isRefrigerateOnly, SEALED, HIGH_ACID, type Container } from '../lib/container'
+import { inferContainer, isRefrigerateOnly, wordRe, SEALED, HIGH_ACID, type Container } from '../lib/container'
 
 type ShelfLifeEntry = Partial<Record<'fridge' | 'freezer' | 'pantry', number>>
 
@@ -170,9 +170,13 @@ function lookupTable(itemName: string, location: Location): number | undefined {
  *    assumed opened (14 days). Never 30 or 90 — an opened passata is a week.
  * 4. Freezer: table, else 180 for anything sold frozen, else 90.
  */
-export function getShelfLifeDays(itemName: string, location: Location): number {
+/**
+ * @param containerHint the packaging as judged by a scan or chosen by the user;
+ *   falls back to inference from the name. 'other' means "no opinion".
+ */
+export function getShelfLifeDays(itemName: string, location: Location, containerHint?: Container | null): number {
   const table = lookupTable(itemName, location)
-  const container = inferContainer(itemName)
+  const container = containerHint && containerHint !== 'other' ? containerHint : inferContainer(itemName)
 
   if (isRefrigerateOnly(itemName)) {
     if (location === 'pantry') return Math.min(table ?? REFRIGERATE_ONLY_IN_PANTRY, REFRIGERATE_ONLY_IN_PANTRY)
@@ -203,16 +207,19 @@ export function getShelfLifeDays(itemName: string, location: Location): number {
  * assumed for perishables; condiments and oils are forgiving.
  */
 const OPENED_DAYS: [RegExp, number][] = [
-  [/coconut milk|evaporated milk|condensed milk|broth|stock|wine/, 5],
-  [/beans|chickpeas|tuna|sardines|mussels|trout|salmon|anchov|shrimp|corn/, 3],
-  [/tomato|marinara|passata|pasta sauce|pizza sauce/, 7],
-  [/salsa|pesto|hummus/, 7],
-  [/pickle|olives|capers|sauerkraut|kimchi|jam|jelly|preserves|marmalade|nutella/, 90],
-  [/peanut butter|almond butter|tahini|sesame paste|芝麻醬|miso|gochujang|doubanjiang|chili crisp|curry paste/, 180],
-  [/maple syrup|honey|soy sauce|fish sauce|hot sauce|sriracha|vinegar|worcestershire|mirin/, 365],
-  [/olive oil|oil/, 180],
-  [/ketchup|mustard|mayonnaise|mayo|dressing/, 60],
-  [/curry roux|cereal|crackers|chips|pasta|rice|flour|sugar|oats/, 90],
+  // Word-bounded: a bare /oil/ matched "boiled eggs" and /oats/ matched "goats cheese".
+  [wordRe('coconut milk|evaporated milk|condensed milk|broth|stock|wine'), 5],
+  [wordRe('beans|chickpeas|tuna|sardines|mussels|trout|salmon|anchovies|shrimp|canned corn|corn kernels'), 3],
+  [wordRe('tomatoes|tomato|marinara|passata|pasta sauce|pizza sauce'), 7],
+  [wordRe('salsa|pesto|hummus'), 7],
+  [wordRe('pickles|pickled|olives|capers|sauerkraut|kimchi|jam|jelly|preserves|marmalade|nutella'), 90],
+  [wordRe('peanut butter|almond butter|tahini|sesame paste|芝麻醬|miso|gochujang|doubanjiang|chili crisp|curry paste'), 180],
+  [wordRe('maple syrup|honey|soy sauce|fish sauce|hot sauce|sriracha|vinegar|worcestershire|mirin'), 365],
+  [wordRe('olive oil|oil'), 180],
+  [wordRe('ketchup|mustard|mayonnaise|mayo|dressing'), 60],
+  // Only unambiguous dry-good phrases: a bare 'rice' or 'sugar' also names
+  // rice pudding and sugar snap peas, which are fresh and must take the clamp.
+  [wordRe('curry roux|cereal|crackers|dry pasta|spaghetti|penne|jasmine rice|white rice|brown rice|basmati rice|all purpose flour|bread flour|granulated sugar|brown sugar|rolled oats|tortilla chips|potato chips'), 90],
 ]
 const OPENED_FALLBACK: Record<Location, number> = { fridge: 7, freezer: 90, pantry: 30 }
 
