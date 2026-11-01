@@ -89,7 +89,7 @@ describe('ReceiptScanner', () => {
 
   it('removing a row drops it from the save', async () => {
     invoke.mockResolvedValue({ data: { items: [GOYA, { ...GOYA, name: 'Second Thing' }] }, error: null })
-    const onAdd = vi.fn(async () => ({ data: {}, error: null }))
+    const onAdd = vi.fn(async (_i: { name: string }) => ({ data: {}, error: null }))
     const { container } = render(<ReceiptScanner onAdd={onAdd} onDone={() => {}} />)
     pick(container.querySelectorAll('input[type=file]')[1] as HTMLInputElement, [new File(['x'], 'a.png', { type: 'image/png' })])
     await screen.findByText(/Found 2 items/)
