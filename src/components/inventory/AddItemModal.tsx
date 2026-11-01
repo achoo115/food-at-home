@@ -3,7 +3,7 @@ import { Modal } from '../ui/Modal'
 import { AddItemForm } from './AddItemForm'
 import { ReceiptScanner } from './ReceiptScanner'
 import { BarcodeScanner } from './BarcodeScanner'
-import type { Category, Location, Unit } from '../../types/inventory'
+import type { Category, Location, Unit, Container } from '../../types/inventory'
 
 interface AddItemInput {
   name: string
@@ -13,6 +13,7 @@ interface AddItemInput {
   unit: Unit
   expiry_date?: string
   cost?: number
+  container?: Container | null
 }
 
 type AddMode = 'manual' | 'receipt' | 'barcode'
@@ -25,8 +26,10 @@ interface Props {
 
 export function AddItemModal({ open, onClose, onAdd }: Props) {
   const [mode, setMode] = useState<AddMode | null>(null)
+  const [busy, setBusy] = useState(false)
 
   function handleClose() {
+    if (busy) return // a scan or save is in flight; dismissing would discard it silently
     setMode(null)
     onClose()
   }
@@ -63,7 +66,7 @@ export function AddItemModal({ open, onClose, onAdd }: Props) {
   if (mode === 'receipt') {
     return (
       <Modal open={open} onClose={handleClose} title="Scan Receipt">
-        <ReceiptScanner onAdd={onAdd} onDone={handleClose} />
+        <ReceiptScanner onAdd={onAdd} onDone={() => { setBusy(false); handleClose() }} onBusy={setBusy} />
       </Modal>
     )
   }

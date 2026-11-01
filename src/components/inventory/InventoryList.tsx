@@ -6,11 +6,12 @@ interface Props {
   items: InventoryItem[]
   onMarkConsumed: (id: string) => void
   onMarkWasted: (id: string) => void
+  onMarkOpened?: (id: string) => void
 }
 
 type SortBy = 'expiry_date' | 'added_at' | 'category'
 
-export function InventoryList({ items, onMarkConsumed, onMarkWasted }: Props) {
+export function InventoryList({ items, onMarkConsumed, onMarkWasted, onMarkOpened }: Props) {
   const [filterLocation, setFilterLocation] = useState<Location | 'all'>('all')
   const [filterCategory, setFilterCategory] = useState<Category | 'all'>('all')
   const [sortBy, setSortBy] = useState<SortBy>('expiry_date')
@@ -65,7 +66,7 @@ export function InventoryList({ items, onMarkConsumed, onMarkWasted }: Props) {
         <p className="text-gray-400 text-center py-8">No items yet. Add some groceries!</p>
       ) : (
         filtered.map((item) => (
-          <InventoryCard key={item.id} item={item} onMarkConsumed={onMarkConsumed} onMarkWasted={onMarkWasted} />
+          <InventoryCard key={item.id} item={item} onMarkConsumed={onMarkConsumed} onMarkWasted={onMarkWasted} onMarkOpened={onMarkOpened} />
         ))
       )}
     </div>

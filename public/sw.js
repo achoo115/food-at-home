@@ -1,4 +1,4 @@
-const CACHE_NAME = 'food-at-home-v2'
+const CACHE_NAME = 'food-at-home-v3'
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()
@@ -14,6 +14,10 @@ self.addEventListener('activate', (event) => {
 })
 
 self.addEventListener('fetch', (event) => {
+  // Cache API rejects cache.put for non-GET; a POST to /functions/ must go
+  // straight to the network and never be answered from cache.
+  if (event.request.method !== 'GET') return
+
   const url = new URL(event.request.url)
 
   // Network-first for HTML and API calls

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { InventoryItem, Category, Location, Unit, ItemStatus } from '../types/inventory'
-import { getShelfLifeDays } from '../data/shelfLife'
+import type { InventoryItem, Category, Location, Unit, ItemStatus, Container } from '../types/inventory'
+import { getShelfLifeDays, getOpenedShelfLifeDays } from '../data/shelfLife'
+import { inferContainer } from '../lib/container'
 
 interface AddItemInput {
   name: string
@@ -11,6 +12,14 @@ interface AddItemInput {
   unit: Unit
   expiry_date?: string
   cost?: number
+  container?: Container | null
+}
+
+/** YYYY-MM-DD, `days` from now in local time. */
+export function dateAfterDays(days: number, now: Date = new Date()): string {
+  const d = new Date(now)
+  d.setDate(d.getDate() + days)
+  return d.toISOString().split('T')[0]
 }
 
 export function useInventory() {
@@ -46,12 +55,10 @@ export function useInventory() {
     let estimatedExpiry = false
 
     if (!expiryDate) {
-      const days = getShelfLifeDays(input.name, input.location)
-      const date = new Date()
-      date.setDate(date.getDate() + days)
-      expiryDate = date.toISOString().split('T')[0]
+      expiryDate = dateAfterDays(getShelfLifeDays(input.name, input.location))
       estimatedExpiry = true
     }
+    const container = input.container ?? inferContainer(input.name)
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -68,6 +75,7 @@ export function useInventory() {
         expiry_date: expiryDate,
         estimated_expiry: estimatedExpiry,
         cost: input.cost ?? null,
+        container,
       })
       .select()
       .single()
@@ -103,6 +111,22 @@ export function useInventory() {
     return result
   }
 
+  /**
+   * Mark a sealed item opened: records the date and resets the expiry to the
+   * opened shelf life (a can of beans: 2 years sealed, 3 days opened). Only
+   * meaningful for sealed containers; the card hides the control otherwise.
+   */
+  async function markOpened(id: string) {
+    const item = items.find((i) => i.id === id)
+    if (!item) return
+    const today = dateAfterDays(0)
+    return updateItem(id, {
+      opened_at: today,
+      expiry_date: dateAfterDays(getOpenedShelfLifeDays(item.name, item.location)),
+      estimated_expiry: true,
+    })
+  }
+
   async function deleteItem(id: string) {
     const { error } = await supabase
       .from('inventory_items')
@@ -124,5 +148,5 @@ export function useInventory() {
     return updateItem(id, { quantity: newQty })
   }
 
-  return { items, allItems, loading, addItem, updateItem, updateStatus, deleteItem, deductQuantity, refetch: fetchItems }
+  return { items, allItems, loading, addItem, updateItem, updateStatus, markOpened, deleteItem, deductQuantity, refetch: fetchItems }
 }

@@ -7,7 +7,7 @@ import { GroceryList } from '../components/grocery/GroceryList'
 import { CheckInFlow } from '../components/grocery/CheckInFlow'
 
 export function InventoryPage() {
-  const { items, loading, addItem, updateStatus } = useInventory()
+  const { items, loading, addItem, updateStatus, markOpened } = useInventory()
   const grocery = useGroceryList()
   const [showAdd, setShowAdd] = useState(false)
   const [showCheckIn, setShowCheckIn] = useState(false)
@@ -42,6 +42,7 @@ export function InventoryPage() {
             items={items}
             onMarkConsumed={(id) => updateStatus(id, 'consumed')}
             onMarkWasted={(id) => updateStatus(id, 'wasted')}
+            onMarkOpened={markOpened}
           />
           <button
             onClick={() => setShowAdd(true)}

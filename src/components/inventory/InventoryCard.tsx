@@ -1,11 +1,13 @@
 import type { InventoryItem } from '../../types/inventory'
 import { useToday } from '../../hooks/useToday'
 import { daysUntilExpiry } from '../../lib/expiry'
+import { inferContainer, SEALED } from '../../lib/container'
 
 interface Props {
   item: InventoryItem
   onMarkConsumed: (id: string) => void
   onMarkWasted: (id: string) => void
+  onMarkOpened?: (id: string) => void
 }
 
 function expiryColor(days: number | null): string {
@@ -22,9 +24,12 @@ function expiryLabel(days: number | null): string {
   return `${days} days`
 }
 
-export function InventoryCard({ item, onMarkConsumed, onMarkWasted }: Props) {
+export function InventoryCard({ item, onMarkConsumed, onMarkWasted, onMarkOpened }: Props) {
   const today = useToday()
   const days = daysUntilExpiry(item.expiry_date, today)
+  const container = item.container ?? inferContainer(item.name)
+  const sealed = container !== null && SEALED.has(container)
+  const canOpen = sealed && !item.opened_at && !!onMarkOpened
 
   return (
     <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center justify-between">
@@ -32,12 +37,18 @@ export function InventoryCard({ item, onMarkConsumed, onMarkWasted }: Props) {
         <p className="font-semibold text-gray-900">{item.name}</p>
         <p className="text-sm text-gray-500">
           {item.quantity} {item.unit} · {item.location}
+          {item.opened_at && <span className="ml-1 text-amber-600">· opened</span>}
         </p>
       </div>
       <div className="flex items-center gap-2">
         <span className={`text-xs font-medium px-2 py-1 rounded-full ${expiryColor(days)}`}>
           {expiryLabel(days)}
         </span>
+        {canOpen && (
+          <button onClick={() => onMarkOpened(item.id)} className="text-amber-600 text-xs font-medium border border-amber-200 rounded-full px-2 py-0.5" title="Mark opened — resets the expiry to the opened shelf life">
+            Open
+          </button>
+        )}
         <button onClick={() => onMarkConsumed(item.id)} className="text-green-600 text-sm font-medium" title="Mark consumed">✓</button>
         <button onClick={() => onMarkWasted(item.id)} className="text-red-400 text-sm" title="Mark wasted">✕</button>
       </div>
