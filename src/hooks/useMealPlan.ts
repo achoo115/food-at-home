@@ -19,11 +19,12 @@ export function useMealPlan() {
   const [loading, setLoading] = useState(true)
 
   const fetchMeals = useCallback(async (id: string) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('meal_plan_meals')
       .select('id, meal_type, slot_order, recipe:recipes(*, recipe_ingredients(*))')
       .eq('meal_plan_id', id)
       .order('slot_order')
+    if (error) return // keep the last known plan rather than showing an empty week
     setMeals(((data ?? []) as unknown as PlannedMeal[]).filter((m) => m.recipe))
   }, [])
 
@@ -51,19 +52,26 @@ export function useMealPlan() {
     return data?.id ?? null
   }, [planId, week])
 
-  const setSlot = useCallback(async (recipeId: string, mealType: string, slotOrder: number) => {
+  // One recipe per slot, written as a single upsert on the (plan, slot) unique
+  // index — a failed write leaves the old meal in place instead of deleting it
+  // first and losing it when the insert does not land. Returns whether it landed.
+  const setSlot = useCallback(async (recipeId: string, mealType: string, slotOrder: number): Promise<boolean> => {
     const id = await ensurePlan()
-    if (!id) return
-    // one recipe per slot: clear whatever's in this slot first
-    await supabase.from('meal_plan_meals').delete().eq('meal_plan_id', id).eq('slot_order', slotOrder)
-    await supabase.from('meal_plan_meals').insert({ meal_plan_id: id, recipe_id: recipeId, meal_type: mealType, slot_order: slotOrder })
+    if (!id) return false
+    const { error } = await supabase
+      .from('meal_plan_meals')
+      .upsert({ meal_plan_id: id, recipe_id: recipeId, meal_type: mealType, slot_order: slotOrder }, { onConflict: 'meal_plan_id,slot_order' })
+    if (error) return false
     await fetchMeals(id)
+    return true
   }, [ensurePlan, fetchMeals])
 
-  const clearSlot = useCallback(async (slotOrder: number) => {
-    if (!planId) return
-    await supabase.from('meal_plan_meals').delete().eq('meal_plan_id', planId).eq('slot_order', slotOrder)
+  const clearSlot = useCallback(async (slotOrder: number): Promise<boolean> => {
+    if (!planId) return false
+    const { error } = await supabase.from('meal_plan_meals').delete().eq('meal_plan_id', planId).eq('slot_order', slotOrder)
+    if (error) return false
     await fetchMeals(planId)
+    return true
   }, [planId, fetchMeals])
 
   return { week, meals, loading, setSlot, clearSlot }

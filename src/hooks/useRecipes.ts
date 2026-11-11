@@ -106,7 +106,7 @@ export function useRecipes() {
     if (recipeError || !recipeData) return
 
     if (recipe.ingredients.length > 0) {
-      await supabase.from('recipe_ingredients').insert(
+      const { error: ingredientError } = await supabase.from('recipe_ingredients').insert(
         recipe.ingredients.map((ing) => ({
           recipe_id: recipeData.id,
           name: ing.name,
@@ -115,6 +115,12 @@ export function useRecipes() {
           is_optional: ing.is_optional ?? false,
         }))
       )
+      // Fail closed: a recipe without its ingredients would plan as empty and
+      // add nothing to a shopping list. Remove the half-written row.
+      if (ingredientError) {
+        await supabase.from('recipes').delete().eq('id', recipeData.id)
+        return
+      }
     }
 
     await fetchSaved()

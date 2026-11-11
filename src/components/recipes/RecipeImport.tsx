@@ -3,7 +3,8 @@ import { importFromUrl, importFromText, importFromImage, type ImportedRecipe } f
 import { MacroBadges } from './MacroBadges'
 
 interface Props {
-  onSave: (recipe: ImportedRecipe) => Promise<void>
+  /** Resolves true only when the recipe is in the library. */
+  onSave: (recipe: ImportedRecipe) => Promise<boolean>
 }
 
 export function RecipeImport({ onSave }: Props) {
@@ -38,9 +39,15 @@ export function RecipeImport({ onSave }: Props) {
 
   async function save() {
     if (!preview) return
-    setBusy(true)
-    await onSave(preview)
-    setBusy(false); setSaved(true); setPreview(null); setText(''); setUrl('')
+    setBusy(true); setError('')
+    try {
+      if (!(await onSave(preview))) { setError('The recipe could not be saved — try again.'); return }
+      setSaved(true); setPreview(null); setText(''); setUrl('')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Save failed.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   if (preview) {
@@ -65,6 +72,7 @@ export function RecipeImport({ onSave }: Props) {
             <p className="text-sm text-gray-700 whitespace-pre-line">{preview.instructions}</p>
           </div>
         )}
+        {error && <p className="text-red-500 text-sm">{error}</p>}
         <div className="flex gap-2">
           <button onClick={save} disabled={busy} className="flex-1 py-2 bg-green-600 text-white rounded-lg font-semibold disabled:opacity-50">
             {busy ? 'Saving…' : 'Save recipe'}

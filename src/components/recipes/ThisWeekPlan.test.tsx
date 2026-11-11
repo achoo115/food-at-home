@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+import { describe, expect, it, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react'
 import type { PlannedMeal } from '../../hooks/useMealPlan'
 import type { RecipeWithIngredients } from '../../types/recipe'
@@ -57,7 +57,7 @@ function renderPlan(over: Partial<Parameters<typeof ThisWeekPlan>[0]> = {}) {
     ...over,
   }
   const utils = render(<ThisWeekPlan {...props} />)
-  return { ...utils, props }
+  return { ...utils, props, persist: props.onPersistSlotRecipe as Mock }
 }
 
 function deferred<T>() {
@@ -94,10 +94,10 @@ describe('ThisWeekPlan — week planning state machine', () => {
     const onGenerateForSlot = vi.fn()
       .mockResolvedValueOnce(gen('Satay', ['chicken', 'peanuts']))
       .mockResolvedValue(gen('Chicken Bowl', SAFE))
-    const { props } = renderPlan({ onGenerateForSlot })
+    const { persist } = renderPlan({ onGenerateForSlot })
     await act(async () => { fireEvent.click(screen.getByText(/Plan my week from deals/)) })
     await screen.findByText(/Plan my week from deals/)
-    const persisted = props.onPersistSlotRecipe.mock.calls.map((c) => (c[0] as { title: string }).title)
+    const persisted = persist.mock.calls.map((c: unknown[]) => (c[0] as { title: string }).title)
     expect(persisted).not.toContain('Satay')
     expect(persisted.length).toBe(mp.setSlot.mock.calls.length)
     expect(persisted.length).toBeGreaterThan(0)

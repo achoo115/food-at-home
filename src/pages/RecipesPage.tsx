@@ -98,8 +98,8 @@ export function RecipesPage() {
             inventoryItems={inventoryItems}
             preferences={preferences}
             specials={specials}
-            onGenerateForSlot={async ({ constraints, onSaleItems }) => {
-              const gen = await recipes.generateAiRecipe(inventoryItems, { constraints, onSaleItems })
+            onGenerateForSlot={({ constraints, onSaleItems }) => recipes.generateAiRecipe(inventoryItems, { constraints, onSaleItems })}
+            onPersistSlotRecipe={async (gen) => {
               const saved = await recipes.saveRecipe({
                 title: gen.title, description: gen.description, instructions: gen.instructions,
                 prep_time: gen.prep_time, cook_time: gen.cook_time, source: 'ai_generated',
@@ -107,8 +107,7 @@ export function RecipesPage() {
                 fat_g: gen.fat_g ?? null, fiber_g: gen.fiber_g ?? null, build: gen.build ?? null,
                 ingredients: gen.ingredients.map((i) => ({ name: i.name, quantity: i.quantity, unit: i.unit })),
               })
-              if (!saved) return null
-              return { id: saved.id, title: gen.title, ingredients: gen.ingredients.map((i) => ({ name: i.name })) }
+              return saved?.id ?? null
             }}
             onEnsureEconomics={(r) => recipes.ensureEconomics(r)}
             onAddToGrocery={async (items) => { for (const it of items) await grocery.addItem(it.name, it.quantity, it.unit) }}
@@ -123,7 +122,7 @@ export function RecipesPage() {
             // Save a permanent copy of the photo; fall back to the source link if
             // the image host can't be fetched.
             const storedImage = r.image_url ? (await persistImage(r.image_url)) ?? r.image_url : null
-            await recipes.saveRecipe({
+            const saved = await recipes.saveRecipe({
               title: r.title,
               description: r.description,
               instructions: r.instructions,
@@ -140,6 +139,7 @@ export function RecipesPage() {
               build: r.build,
               ingredients: r.ingredients.map((name) => ({ name, quantity: 1, unit: '' })),
             })
+            return saved != null
           }}
         />
       )}
