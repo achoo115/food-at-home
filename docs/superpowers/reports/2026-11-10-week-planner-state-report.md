@@ -35,3 +35,15 @@ Deferred (not data-losing, separate changes): wake lock during a plan; resumable
 | L | RecipeImport.tsx | `if (!(await onSave(preview)))` → `&& false` | no false "Saved ✓" |
 | M | RecipeImport.tsx | catch message → constant | thrown host leaves form usable |
 Logs: scratchpad `fah/mut/*.log` (each contains "RED as required").
+
+## Auditor round 1 (bc8fbcc): FIX-FIRST — P1-1 archive fill ignored cancel/unmount and write results; P1-2 an open manual picker stayed live during a run. Auditor reproduced A, E, H, I, K red and confirmed 12/15 red on b9df17b; StrictMode 7/7.
+Fix round (63286a5, 316bf1c): archive loop resets+checks the cancel ref and counts failed writes into the note; `begin()` closes the picker (single guard — the per-button busy checks masked mutation P and were removed); swap pre-request lines inside try (P2-4); clearSlot error pinned (P2-1).
+P2-2 accepted as a tradeoff, stated plainly: a candidate is persisted after the hard-no/protein/cancel checks but BEFORE its slot write; a cancel landing during the save, or a failed slot write, leaves a real, reusable recipe in the library that is in no plan.
+
+| id | file | flipped | failing test |
+|---|---|---|---|
+| N | ThisWeekPlan.tsx | archive `if (cancelRef.current) return` → `&& false` | unmounting during an archive fill stops the writes |
+| O | ThisWeekPlan.tsx | `failed++` → `failed += 0` on a false setSlot | archive write that does not land is reported |
+| P | ThisWeekPlan.tsx | `setPicking(null)` in begin() removed | open picker cannot write under the run |
+| Q | useMealPlan.ts | clearSlot `if (error) return false` dropped | clearSlot reports a delete that did not land |
+Full suite on 316bf1c: Test Files 21 passed (21) / Tests 224 passed (224); tsc_exit=0; build_exit=0.
