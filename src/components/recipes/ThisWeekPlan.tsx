@@ -300,8 +300,8 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
               <div className="space-y-1 max-h-64 overflow-y-auto">
                 {ranked.length === 0 && <p className="text-sm text-gray-400">No saved recipes yet.</p>}
                 {ranked.map((r) => (
-                  <button key={r.id} disabled={busy} onClick={async () => { if (busy) return; if (await setSlot(r.id, slot.meal_type, i)) setPicking(null); else setPlanNote('That meal could not be saved — try again.') }}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 flex items-center justify-between disabled:opacity-40">
+                  <button key={r.id} onClick={async () => { if (await setSlot(r.id, slot.meal_type, i)) setPicking(null); else setPlanNote('That meal could not be saved — try again.') }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 flex items-center justify-between">
                     <span className="text-sm">{r.is_favorited ? '❤️ ' : ''}{r.title}</span>
                     <span className="text-xs text-gray-400">{r.last_cooked_at ? 'cooked' : 'new'}</span>
                   </button>
