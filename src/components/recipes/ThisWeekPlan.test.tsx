@@ -176,13 +176,45 @@ describe('ThisWeekPlan — week planning state machine', () => {
     expect(mp.setSlot).toHaveBeenCalledTimes(1)
   })
 
-  it('a slot write that does not land during an archive fill is reported, not silent', async () => {
+  it('a slot write that does not land during an archive fill is reported after the unfilled note, not silent', async () => {
     const savedRecipes = [recipe('a', 'Oats', ['oats', 'milk']), recipe('b', 'Chicken Salad', ['chicken', 'lettuce'])]
+    const { picks, unfilledSlots } = pickWeekFromArchive(savedRecipes, prefs, MEAL_SLOTS)
+    expect(unfilledSlots.length).toBeGreaterThan(0)
+    const labels = unfilledSlots.map((i) => MEAL_SLOTS[i].label.toLowerCase()).join(', ')
     mp.setSlot.mockResolvedValue(false)
     renderPlan({ savedRecipes })
     await act(async () => { fireEvent.click(screen.getByText(/Plan from my recipes/)) })
-    await screen.findByText(/could not be saved/i)
+    const plural = picks.length > 1 ? 's' : ''
+    await screen.findByText(`Couldn’t fill ${labels} from your saved recipes — add one manually or import more. ${picks.length} meal${plural} could not be saved — try again.`)
     expect((screen.getByText(/Plan from my recipes/) as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('with unfilled slots and every write landing, only the unfilled sentence shows', async () => {
+    const savedRecipes = [recipe('a', 'Oats', ['oats', 'milk'])]
+    const { unfilledSlots } = pickWeekFromArchive(savedRecipes, prefs, MEAL_SLOTS)
+    expect(unfilledSlots.length).toBeGreaterThan(0)
+    const labels = unfilledSlots.map((i) => MEAL_SLOTS[i].label.toLowerCase()).join(', ')
+    renderPlan({ savedRecipes })
+    await act(async () => { fireEvent.click(screen.getByText(/Plan from my recipes/)) })
+    await screen.findByText(`Couldn’t fill ${labels} from your saved recipes — add one manually or import more.`)
+    expect(screen.queryByText(/could not be saved/)).toBeNull()
+  })
+
+  it('unmounting while the archive fill is clearing unfilled slots stops the remaining clears and every slot write', async () => {
+    const savedRecipes = [recipe('a', 'Oats', ['oats', 'milk'])]
+    const { picks, unfilledSlots } = pickWeekFromArchive(savedRecipes, prefs, MEAL_SLOTS)
+    expect(unfilledSlots.length).toBeGreaterThan(1)
+    expect(picks.length).toBeGreaterThan(0)
+    const first = deferred<boolean>()
+    mp.clearSlot.mockReturnValueOnce(first.promise)
+    const { unmount } = renderPlan({ savedRecipes })
+    await act(async () => { fireEvent.click(screen.getByText(/Plan from my recipes/)) })
+    expect(mp.clearSlot).toHaveBeenCalledTimes(1)
+    unmount()
+    await act(async () => { first.resolve(true) })
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)) })
+    expect(mp.clearSlot).toHaveBeenCalledTimes(1)
+    expect(mp.setSlot).not.toHaveBeenCalled()
   })
 
   it('a manual picker that was open when a plan starts cannot write a slot under the run', async () => {
