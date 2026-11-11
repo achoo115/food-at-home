@@ -73,6 +73,7 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
     if (runningRef.current) return false
     runningRef.current = true
     setStatus(next)
+    setPicking(null) // an open manual picker must not write a slot under the run
     return true
   }
   function end() { runningRef.current = false; setStatus({ kind: 'idle' }) }
@@ -89,16 +90,26 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
     if (busy) return
     if (filledCount > 0 && !window.confirm('Replace this week’s planned meals with picks from your saved recipes?')) return
     if (!begin({ kind: 'archiving' })) return
-    setSummary(null); setArchiveNote(''); setListMsg('')
+    setSummary(null); setArchiveNote(''); setListMsg(''); cancelRef.current = false
     try {
       const { picks, unfilledSlots } = pickWeekFromArchive(savedRecipes, preferences, MEAL_SLOTS)
+      let failed = 0
       // clear slots we won't fill so a re-plan doesn't leave stale meals
-      for (const i of unfilledSlots) await clearSlot(i)
-      for (const p of picks) await setSlot(p.recipe.id, MEAL_SLOTS[p.slotIndex].meal_type, p.slotIndex)
+      for (const i of unfilledSlots) {
+        if (cancelRef.current) return
+        if (!(await clearSlot(i))) failed++
+      }
+      for (const p of picks) {
+        if (cancelRef.current) return
+        if (!(await setSlot(p.recipe.id, MEAL_SLOTS[p.slotIndex].meal_type, p.slotIndex))) failed++
+      }
+      const notes: string[] = []
       if (unfilledSlots.length) {
         const labels = unfilledSlots.map((i) => MEAL_SLOTS[i].label.toLowerCase()).join(', ')
-        setArchiveNote(`Couldn’t fill ${labels} from your saved recipes — add one manually or import more.`)
+        notes.push(`Couldn’t fill ${labels} from your saved recipes — add one manually or import more.`)
       }
+      if (failed) notes.push(`${failed} meal${failed > 1 ? 's' : ''} could not be saved — try again.`)
+      setArchiveNote(notes.join(' '))
     } finally {
       end()
     }
@@ -211,12 +222,12 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
     if (busy) return
     if (!begin({ kind: 'swapping', slot: i })) return
     setSummary(null); cancelRef.current = false
-    const others = meals.filter((m) => m.slot_order !== i)
-    const otherTitles = others.map((m) => ({ title: m.recipe.title }))
-    const otherProteins = others
-      .map((m) => mainProtein(m.recipe.build?.pro, (m.recipe.recipe_ingredients ?? []).map((x) => x.name)))
-      .filter((p) => p !== 'other')
     try {
+      const others = meals.filter((m) => m.slot_order !== i)
+      const otherTitles = others.map((m) => ({ title: m.recipe.title }))
+      const otherProteins = others
+        .map((m) => mainProtein(m.recipe.build?.pro, (m.recipe.recipe_ingredients ?? []).map((x) => x.name)))
+        .filter((p) => p !== 'other')
       const r = await generateSlot(i, otherTitles, otherProteins)
       if (cancelRef.current) return
       if (!r || !(await setSlot(r.id, MEAL_SLOTS[i].meal_type, i))) setPlanNote('Couldn’t find a different meal for that slot — try again.')
@@ -289,8 +300,8 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
               <div className="space-y-1 max-h-64 overflow-y-auto">
                 {ranked.length === 0 && <p className="text-sm text-gray-400">No saved recipes yet.</p>}
                 {ranked.map((r) => (
-                  <button key={r.id} onClick={async () => { await setSlot(r.id, slot.meal_type, i); setPicking(null) }}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 flex items-center justify-between">
+                  <button key={r.id} disabled={busy} onClick={async () => { if (busy) return; if (await setSlot(r.id, slot.meal_type, i)) setPicking(null); else setPlanNote('That meal could not be saved — try again.') }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 flex items-center justify-between disabled:opacity-40">
                     <span className="text-sm">{r.is_favorited ? '❤️ ' : ''}{r.title}</span>
                     <span className="text-xs text-gray-400">{r.last_cooked_at ? 'cooked' : 'new'}</span>
                   </button>

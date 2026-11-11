@@ -60,6 +60,16 @@ describe('useMealPlan.setSlot', () => {
     expect(result.current.meals.map((m) => m.recipe.title)).toEqual(['Oats'])
   })
 
+  it('clearSlot reports a delete that did not land and keeps the meal', async () => {
+    const { result } = renderHook(() => useMealPlan())
+    await waitFor(() => expect(result.current.meals).toHaveLength(1))
+    results['meal_plan_meals.delete'] = { data: null, error: { message: 'TypeError: Failed to fetch' } }
+    let ok: boolean | undefined
+    await act(async () => { ok = await result.current.clearSlot(0) })
+    expect(ok).toBe(false)
+    expect(result.current.meals).toHaveLength(1)
+  })
+
   it('a failed meals fetch keeps the last known plan instead of showing an empty week', async () => {
     const { result } = renderHook(() => useMealPlan())
     await waitFor(() => expect(result.current.meals).toHaveLength(1))

@@ -158,6 +158,49 @@ describe('ThisWeekPlan — week planning state machine', () => {
     expect(mp.setSlot).not.toHaveBeenCalled()
   })
 
+  it('unmounting during an archive fill stops the remaining slot writes', async () => {
+    const savedRecipes = [
+      recipe('a', 'Oats', ['oats', 'milk']), recipe('b', 'Chicken Salad', ['chicken', 'lettuce']),
+      recipe('c', 'Salmon Rice', ['salmon', 'rice']), recipe('d', 'Tofu Stir Fry', ['tofu', 'rice']),
+    ]
+    const { picks } = pickWeekFromArchive(savedRecipes, prefs, MEAL_SLOTS)
+    expect(picks.length).toBeGreaterThan(1)
+    const first = deferred<boolean>()
+    mp.setSlot.mockReturnValueOnce(first.promise)
+    const { unmount } = renderPlan({ savedRecipes })
+    await act(async () => { fireEvent.click(screen.getByText(/Plan from my recipes/)) })
+    expect(mp.setSlot).toHaveBeenCalledTimes(1)
+    unmount()
+    await act(async () => { first.resolve(true) })
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)) })
+    expect(mp.setSlot).toHaveBeenCalledTimes(1)
+  })
+
+  it('a slot write that does not land during an archive fill is reported, not silent', async () => {
+    const savedRecipes = [recipe('a', 'Oats', ['oats', 'milk']), recipe('b', 'Chicken Salad', ['chicken', 'lettuce'])]
+    mp.setSlot.mockResolvedValue(false)
+    renderPlan({ savedRecipes })
+    await act(async () => { fireEvent.click(screen.getByText(/Plan from my recipes/)) })
+    await screen.findByText(/could not be saved/i)
+    expect((screen.getByText(/Plan from my recipes/) as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('a manual picker that was open when a plan starts cannot write a slot under the run', async () => {
+    mp.meals = []
+    const savedRecipes = [recipe('a', 'Oats', ['oats', 'milk'])]
+    const d = deferred<ReturnType<typeof gen>>()
+    const onGenerateForSlot = vi.fn(() => d.promise)
+    renderPlan({ savedRecipes, onGenerateForSlot })
+    await act(async () => { fireEvent.click(screen.getAllByText(/Add dinner manually/)[0]) })
+    expect(screen.getByText('Oats')).toBeTruthy()
+    await act(async () => { fireEvent.click(screen.getByText(/Plan my week from deals/)) })
+    await screen.findByText(/Planning breakfast/)
+    const pick = screen.queryByText('Oats')
+    if (pick) await act(async () => { fireEvent.click(pick) })
+    expect(mp.setSlot).not.toHaveBeenCalled()
+    await act(async () => { d.resolve(gen('Chicken Bowl', SAFE)) })
+  })
+
   it('the shopping preview follows the plan instead of a snapshot taken when it opened', async () => {
     mp.meals = [meal(0, recipe('a', 'Oats', ['oats', 'milk'])), meal(2, recipe('c', 'Salmon Rice', ['salmon', 'rice']))]
     const { rerender, props } = renderPlan()
