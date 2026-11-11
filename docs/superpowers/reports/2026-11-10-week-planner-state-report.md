@@ -47,3 +47,10 @@ P2-2 accepted as a tradeoff, stated plainly: a candidate is persisted after the 
 | P | ThisWeekPlan.tsx | `setPicking(null)` in begin() removed | open picker cannot write under the run |
 | Q | useMealPlan.ts | clearSlot `if (error) return false` dropped | clearSlot reports a delete that did not land |
 Full suite on 316bf1c: Test Files 21 passed (21) / Tests 224 passed (224); tsc_exit=0; build_exit=0.
+
+## Auditor round 2 (0d32cce): FIX-FIRST on coverage only — product code accepted; N and P reproduced red; found the clearSlot-half cancel guard unmutated and the archive note sentences unpinned. Round 3 (f2977bc) is the final pass per the three-round cap.
+| id | file | flipped | failing test |
+|---|---|---|---|
+| R | ThisWeekPlan.tsx | archive clear-loop `if (cancelRef.current) return` → `&& false` | unmount while clearing unfilled slots stops the clears |
+| S | ThisWeekPlan.tsx | `notes.join(' ')` → `join('')` | failed write reported after the unfilled note |
+| T | ThisWeekPlan.tsx | unfilled sentence shortened | only the unfilled sentence shows when every write lands |
