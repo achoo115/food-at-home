@@ -20,6 +20,9 @@ function readFile(file: File): Promise<{ base64: string; mediaType: string }> {
   })
 }
 
+// One page that never answers must not hold the whole batch on "Scanned 3 of 4…".
+const PAGE_TIMEOUT_MS = 60_000
+
 // Merge specials from several flyer pages, deduping by item name (case-insensitive)
 // and preferring an entry that actually has a sale price.
 function dedupe(items: ScannedSpecial[]): ScannedSpecial[] {
@@ -40,15 +43,17 @@ export function SpecialsScanner({ onScanned, onDone }: Props) {
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [partial, setPartial] = useState('')
 
-  async function scanOne(file: File): Promise<ScannedSpecial[]> {
+  // null = the page could not be read (bad file, error, or no answer in time)
+  async function scanOne(file: File): Promise<ScannedSpecial[] | null> {
     try {
       const { base64, mediaType } = await readFile(file)
-      const { data, error: fnError } = await supabase.functions.invoke('scan-specials', { body: { imageBase64: base64, mediaType } })
-      if (fnError || data?.error || !Array.isArray(data)) return []
+      const { data, error: fnError } = await supabase.functions.invoke('scan-specials', { body: { imageBase64: base64, mediaType }, timeout: PAGE_TIMEOUT_MS })
+      if (fnError || data?.error || !Array.isArray(data)) return null
       return data as ScannedSpecial[]
     } catch {
-      return [] // one bad screenshot never sinks the batch
+      return null // one bad screenshot never sinks the batch
     }
   }
 
@@ -59,7 +64,7 @@ export function SpecialsScanner({ onScanned, onDone }: Props) {
       // Scan pages concurrently (cap 5) so 25 screenshots take seconds, not a minute;
       // tolerate per-page failures and just merge whatever parsed.
       const CONCURRENCY = 5
-      const results: ScannedSpecial[][] = new Array(files.length)
+      const results: (ScannedSpecial[] | null)[] = new Array(files.length)
       let done = 0
       let next = 0
       const worker = async () => {
@@ -72,11 +77,15 @@ export function SpecialsScanner({ onScanned, onDone }: Props) {
       }
       await Promise.all(Array.from({ length: Math.min(CONCURRENCY, files.length) }, worker))
 
-      const merged = dedupe(results.flat())
-      if (merged.length === 0) throw new Error('No sale items found in those images.')
+      const unread = results.filter((r) => r === null).length
+      const merged = dedupe(results.flatMap((r) => r ?? []))
+      if (merged.length === 0) throw new Error(unread ? 'Those pages could not be read — try again.' : 'No sale items found in those images.')
       setStatus(`Saving ${merged.length} deals…`)
       await onScanned(merged)
-      onDone()
+      // The save replaces this week's scanned deals, so a page that dropped
+      // out is worth knowing about before closing.
+      if (unread) setPartial(`Saved ${merged.length} deals, but ${unread} of ${files.length} pages could not be read. Scan again to include them.`)
+      else onDone()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not read the flyer.')
       setBusy(false)
@@ -93,7 +102,12 @@ export function SpecialsScanner({ onScanned, onDone }: Props) {
   return (
     <div className="space-y-3">
       <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={onPick} />
-      {busy ? (
+      {partial ? (
+        <>
+          <p className="text-sm text-amber-600">{partial}</p>
+          <button onClick={onDone} className="w-full py-2 bg-gray-100 text-gray-700 rounded-lg font-semibold">Done</button>
+        </>
+      ) : busy ? (
         <div className="w-full py-12 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 text-center">
           {status || 'Working…'}
         </div>

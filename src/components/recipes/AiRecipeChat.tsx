@@ -7,7 +7,8 @@ import { MacroBadges } from './MacroBadges'
 interface Props {
   inventoryItems: InventoryItem[]
   onGenerate: (items: InventoryItem[], options: { mood?: string; maxTime?: number; cuisine?: string }) => Promise<GeneratedRecipe>
-  onSave: (recipe: GeneratedRecipe) => void
+  /** Resolves with the saved row, or with nothing when it did not land. */
+  onSave: (recipe: GeneratedRecipe) => Promise<unknown>
   onCook: (recipe: GeneratedRecipe) => void
 }
 
@@ -18,6 +19,15 @@ export function AiRecipeChat({ inventoryItems, onGenerate, onSave, onCook }: Pro
   const [result, setResult] = useState<GeneratedRecipe | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  // Tagged with the recipe it is about: a slow save that finishes after a new
+  // recipe was generated must not mark the new one as saved.
+  const [saveOf, setSaveOf] = useState<{ recipe: GeneratedRecipe; state: 'saving' | 'saved' | 'failed' } | null>(null)
+  const save = saveOf && saveOf.recipe === result ? saveOf.state : 'idle'
+  async function handleSave(recipe: GeneratedRecipe) {
+    setSaveOf({ recipe, state: 'saving' })
+    const landed = (await onSave(recipe).catch(() => null)) != null
+    setSaveOf({ recipe, state: landed ? 'saved' : 'failed' })
+  }
 
   async function handleGenerate(e: FormEvent) {
     e.preventDefault()
@@ -68,8 +78,15 @@ export function AiRecipeChat({ inventoryItems, onGenerate, onSave, onCook }: Pro
           </div>
           <div className="flex gap-2">
             <button onClick={() => onCook(result)} className="flex-1 py-2 bg-green-600 text-white rounded-lg font-semibold">Cook This</button>
-            <button onClick={() => onSave(result)} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg">Save</button>
+            <button
+              onClick={() => handleSave(result)}
+              disabled={save === 'saving' || save === 'saved'}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg disabled:opacity-60"
+            >
+              {save === 'saving' ? 'Saving…' : save === 'saved' ? 'Saved ✓' : 'Save'}
+            </button>
           </div>
+          {save === 'failed' && <p className="text-red-500 text-sm">Couldn’t save that recipe — try again.</p>}
         </div>
       )}
     </div>

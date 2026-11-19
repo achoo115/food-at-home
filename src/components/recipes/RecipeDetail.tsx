@@ -10,13 +10,23 @@ function stripHtml(html: string): string {
 interface Props {
   recipeId: number | null
   onClose: () => void
-  onSave: (recipe: SpoonacularDetail) => void
+  /** Resolves with the saved row, or with nothing when it did not land. */
+  onSave: (recipe: SpoonacularDetail) => Promise<unknown>
   onCook: (recipe: SpoonacularDetail) => void
 }
 
 export function RecipeDetail({ recipeId, onClose, onSave, onCook }: Props) {
   const [detail, setDetail] = useState<SpoonacularDetail | null>(null)
   const [loading, setLoading] = useState(false)
+  // Tagged with the recipe it is about: a slow save that finishes after
+  // another recipe was opened must not mark that one as saved.
+  const [saveOf, setSaveOf] = useState<{ recipe: SpoonacularDetail; state: 'saving' | 'saved' | 'failed' } | null>(null)
+  const save = saveOf && saveOf.recipe === detail ? saveOf.state : 'idle'
+  async function handleSave(recipe: SpoonacularDetail) {
+    setSaveOf({ recipe, state: 'saving' })
+    const landed = (await onSave(recipe).catch(() => null)) != null
+    setSaveOf({ recipe, state: landed ? 'saved' : 'failed' })
+  }
 
   useEffect(() => {
     if (!recipeId) return
@@ -55,8 +65,15 @@ export function RecipeDetail({ recipeId, onClose, onSave, onCook }: Props) {
           )}
           <div className="flex gap-2">
             <button onClick={() => onCook(detail)} className="flex-1 py-3 bg-green-600 text-white rounded-lg font-semibold">Cook This</button>
-            <button onClick={() => onSave(detail)} className="px-4 py-3 bg-gray-100 text-gray-700 rounded-lg font-semibold">Save</button>
+            <button
+              onClick={() => handleSave(detail)}
+              disabled={save === 'saving' || save === 'saved'}
+              className="px-4 py-3 bg-gray-100 text-gray-700 rounded-lg font-semibold disabled:opacity-60"
+            >
+              {save === 'saving' ? 'Saving…' : save === 'saved' ? 'Saved ✓' : 'Save'}
+            </button>
           </div>
+          {save === 'failed' && <p className="text-red-500 text-sm">Couldn’t save that recipe — try again.</p>}
         </div>
       ) : (
         <p className="text-gray-400 text-center py-8">Could not load recipe</p>

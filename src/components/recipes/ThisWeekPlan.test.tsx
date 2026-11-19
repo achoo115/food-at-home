@@ -15,6 +15,9 @@ const mp = {
   week: '2026-11-09',
   meals: [] as PlannedMeal[],
   loading: false,
+  loadFailed: false,
+  reload: vi.fn(),
+  syncWeek: vi.fn(() => '2026-11-09'),
   setSlot: vi.fn(async () => true),
   clearSlot: vi.fn(async () => true),
 }
@@ -69,6 +72,8 @@ function deferred<T>() {
 
 beforeEach(() => {
   mp.meals = []
+  mp.loadFailed = false
+  mp.reload.mockClear(); mp.syncWeek.mockReset(); mp.syncWeek.mockReturnValue('2026-11-09')
   mp.setSlot.mockClear(); mp.clearSlot.mockClear()
   vi.spyOn(window, 'confirm').mockReturnValue(true)
 })
@@ -242,5 +247,118 @@ describe('ThisWeekPlan — week planning state machine', () => {
     rerender(<ThisWeekPlan {...props} />)
     await screen.findByText(/Shopping list — 2 to buy/)
     expect(screen.queryByText(/salmon/)).toBeNull()
+  })
+
+  it('keeps the screen awake while a plan is generating and lets it sleep after', async () => {
+    const release = vi.fn(async () => {})
+    const request = vi.fn(async () => ({ release, addEventListener() {} }))
+    Object.defineProperty(navigator, 'wakeLock', { value: { request }, configurable: true })
+    try {
+      const d = deferred<ReturnType<typeof gen>>()
+      renderPlan({ onGenerateForSlot: vi.fn(() => d.promise) })
+      expect(request).not.toHaveBeenCalled()
+      await act(async () => { fireEvent.click(screen.getByText(/Plan my week from deals/)) })
+      await screen.findByText(/Planning breakfast/)
+      expect(request).toHaveBeenCalledWith('screen')
+      expect(release).not.toHaveBeenCalled()
+      await act(async () => { fireEvent.click(screen.getByText('Cancel')) })
+      await act(async () => { d.resolve(gen('Chicken Bowl', SAFE)) })
+      await screen.findByText(/Plan my week from deals/)
+      await waitFor(() => expect(release).toHaveBeenCalledTimes(1))
+    } finally {
+      delete (navigator as unknown as { wakeLock?: unknown }).wakeLock
+    }
+  })
+
+  it('"Fill the empty slots" picks an interrupted plan back up: kept meals stay, count toward variety, and nothing asks to replace them', async () => {
+    mp.meals = [meal(0, recipe('a', 'Oats', ['oats', 'milk'])), meal(2, recipe('c', 'Chicken Rice', ['chicken thighs', 'rice']))]
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const onGenerateForSlot = vi.fn()
+      .mockResolvedValueOnce(gen('Chicken Bowl', SAFE)) // chicken is already in the week → rejected
+      .mockResolvedValueOnce(gen('Salmon Plate', ['salmon', 'greens']))
+      .mockResolvedValueOnce(gen('Tofu Noodles', ['tofu', 'noodles']))
+    const { persist } = renderPlan({ onGenerateForSlot })
+    await act(async () => { fireEvent.click(screen.getByText(/Fill the 2 empty slots from deals/)) })
+    await screen.findByText(/Replan my week from deals/)
+    expect(confirm).not.toHaveBeenCalled()
+    expect(mp.setSlot.mock.calls.map((c: unknown[]) => c[2])).toEqual([1, 3])
+    expect(mp.clearSlot).not.toHaveBeenCalled()
+    expect(persist.mock.calls.map((c: unknown[]) => (c[0] as { title: string }).title)).toEqual(['Salmon Plate', 'Tofu Noodles'])
+    expect(onGenerateForSlot.mock.calls[0][0].constraints.join(' ')).toMatch(/Oats; Chicken Rice/)
+  })
+
+  it('offers "Fill the empty slots" only for a part-filled week', async () => {
+    renderPlan()
+    expect(screen.queryByText(/Fill the/)).toBeNull()
+    cleanup()
+    mp.meals = MEAL_SLOTS.map((_, i) => meal(i, recipe(`r${i}`, `Meal ${i}`, ['rice'])))
+    renderPlan()
+    expect(screen.queryByText(/Fill the/)).toBeNull()
+  })
+
+  it('a screen still showing last week does not plan: the first tap only moves to the new week', async () => {
+    mp.meals = [meal(0, recipe('a', 'Oats', ['oats']))]
+    mp.syncWeek.mockReturnValue('2026-11-16') // the calendar has moved on; this render is still 11-09
+    const { props } = renderPlan()
+    for (const label of [/Replan my week from deals/, /Fill the 3 empty slots/, /Replan from my recipes/]) {
+      await act(async () => { fireEvent.click(screen.getByText(label)) })
+    }
+    await act(async () => { fireEvent.click(screen.getByTitle('Swap this meal')) })
+    expect(screen.getByText(/A new week has started/)).toBeTruthy()
+    expect(window.confirm).not.toHaveBeenCalled()
+    expect(props.onGenerateForSlot).not.toHaveBeenCalled()
+    expect(mp.setSlot).not.toHaveBeenCalled()
+    expect(mp.clearSlot).not.toHaveBeenCalled()
+  })
+
+  it('every slot a plan writes is pinned to the week the plan started in', async () => {
+    renderPlan()
+    await act(async () => { fireEvent.click(screen.getByText(/Plan my week from deals/)) })
+    await screen.findByText(/Plan my week from deals/)
+    expect(mp.setSlot.mock.calls.length).toBeGreaterThan(0)
+    expect(mp.setSlot.mock.calls.map((c: unknown[]) => c[3])).toEqual(mp.setSlot.mock.calls.map(() => '2026-11-09'))
+  })
+
+  it('a plan that the week changed under says so instead of blaming the slots', async () => {
+    mp.syncWeek.mockReturnValueOnce('2026-11-09').mockReturnValue('2026-11-16') // same week at the tap, a new one by the end
+    mp.setSlot.mockResolvedValue(false)
+    try {
+      renderPlan()
+      await act(async () => { fireEvent.click(screen.getByText(/Plan my week from deals/)) })
+      await screen.findByText(/The week changed while planning/)
+      expect(screen.queryByText(/Couldn’t plan/)).toBeNull()
+    } finally {
+      mp.setSlot.mockResolvedValue(true)
+    }
+  })
+
+  it('a week that failed to load offers Try again and no way to plan over it', async () => {
+    mp.loadFailed = true
+    renderPlan()
+    expect(screen.getByText(/Couldn’t load this week’s plan/)).toBeTruthy()
+    expect(screen.queryByText(/Plan my week from deals/)).toBeNull()
+    expect(screen.queryByText(/Plan from my recipes/)).toBeNull()
+    fireEvent.click(screen.getByText('Try again'))
+    expect(mp.reload).toHaveBeenCalledTimes(1)
+  })
+
+  it('an archive fill and a swap pin their writes to the week they started in', async () => {
+    const savedRecipes = [
+      recipe('a', 'Oats', ['oats', 'milk']), recipe('b', 'Chicken Salad', ['chicken', 'lettuce']),
+      recipe('c', 'Salmon Rice', ['salmon', 'rice']), recipe('d', 'Tofu Stir Fry', ['tofu', 'rice']),
+    ]
+    const { picks } = pickWeekFromArchive(savedRecipes, prefs, MEAL_SLOTS)
+    expect(picks.length).toBeGreaterThan(0)
+    renderPlan({ savedRecipes })
+    await act(async () => { fireEvent.click(screen.getByText(/Plan from my recipes/)) })
+    await waitFor(() => expect(mp.setSlot).toHaveBeenCalledTimes(picks.length))
+    expect(mp.setSlot.mock.calls.map((c: unknown[]) => c[3])).toEqual(picks.map(() => '2026-11-09'))
+    cleanup(); mp.setSlot.mockClear()
+
+    mp.meals = [meal(0, recipe('a', 'Oats', ['oats']))]
+    renderPlan({ onGenerateForSlot: vi.fn(async () => gen('Egg Toast', ['eggs', 'bread'])) })
+    await act(async () => { fireEvent.click(screen.getByTitle('Swap this meal')) })
+    await waitFor(() => expect(mp.setSlot).toHaveBeenCalledTimes(1))
+    expect((mp.setSlot.mock.calls[0] as unknown[])[3]).toBe('2026-11-09')
   })
 })

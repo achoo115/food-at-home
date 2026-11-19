@@ -18,6 +18,14 @@ interface Props {
   onDone: () => void
 }
 
+// html5-qrcode's stop() THROWS (it does not reject) when the scanner is not
+// running or is already stopping — which is the case in the effect cleanup
+// after every decode and after a camera that never started. An exception in a
+// cleanup takes the whole screen down.
+function safeStop(scanner: Html5Qrcode) {
+  try { scanner.stop().catch(() => {}) } catch { /* not running */ }
+}
+
 export function BarcodeScanner({ onAdd, onDone }: Props) {
   const [scannedProduct, setScannedProduct] = useState<{ name: string; category: string } | null>(null)
   const [scanning, setScanning] = useState(true)
@@ -34,11 +42,11 @@ export function BarcodeScanner({ onAdd, onDone }: Props) {
     const scanner = new Html5Qrcode(scannerId)
     scannerRef.current = scanner
 
-    scanner.start(
+    const started = scanner.start(
       { facingMode: 'environment' },
       { fps: 10, qrbox: { width: 250, height: 150 } },
       async (decodedText) => {
-        scanner.stop().catch(() => {})
+        safeStop(scanner)
         setScanning(false)
 
         try {
@@ -53,13 +61,16 @@ export function BarcodeScanner({ onAdd, onDone }: Props) {
         }
       },
       () => {}
-    ).catch(() => {
+    )
+    started.catch(() => {
       setError('Camera access denied')
       setScanning(false)
     })
 
     return () => {
-      scanner.stop().catch(() => {})
+      // After start settles: a camera still opening when the screen closes
+      // would otherwise stay on.
+      started.then(() => safeStop(scanner), () => {})
     }
   }, [scanning])
 
@@ -78,6 +89,7 @@ export function BarcodeScanner({ onAdd, onDone }: Props) {
       {error && (
         <div>
           <p className="text-red-500 text-sm mb-3">{error}</p>
+          <button onClick={() => { setError(''); setScanning(true) }} className="w-full py-2 mb-3 bg-gray-100 text-gray-700 rounded-lg font-semibold">Scan again</button>
           <AddItemForm onAdd={onAdd} onDone={onDone} />
         </div>
       )}

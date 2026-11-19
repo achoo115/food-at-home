@@ -47,8 +47,8 @@ export function RecipesPage() {
     await recipes.searchByInventory(inventoryItems)
   }
 
-  async function handleSaveSpoonacular(detail: SpoonacularDetail) {
-    await recipes.saveRecipe({
+  function handleSaveSpoonacular(detail: SpoonacularDetail) {
+    return recipes.saveRecipe({
       title: detail.title,
       description: detail.summary,
       instructions: detail.instructions,
@@ -166,8 +166,8 @@ export function RecipesPage() {
             const onSaleItems = specials.map((s) => s.item)
             return recipes.generateAiRecipe(items, { ...options, constraints, onSaleItems })
           }}
-          onSave={async (recipe) => {
-            await recipes.saveRecipe({
+          onSave={(recipe) =>
+            recipes.saveRecipe({
               title: recipe.title,
               description: recipe.description,
               instructions: recipe.instructions,
@@ -182,7 +182,7 @@ export function RecipesPage() {
               build: recipe.build ?? null,
               ingredients: recipe.ingredients.map((i) => ({ name: i.name, quantity: i.quantity, unit: i.unit })),
             })
-          }}
+          }
           onCook={(recipe) => {
             setCookRecipe({
               name: recipe.title,

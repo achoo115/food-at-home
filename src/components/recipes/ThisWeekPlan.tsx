@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMealPlan } from '../../hooks/useMealPlan'
+import { useWakeLock } from '../../hooks/useWakeLock'
 import { MEAL_SLOTS, rankForRotation } from '../../lib/mealPlan'
 import { slotConstraints, violatesHardNo, planSavings, countMealsUsingDeals, mainProtein } from '../../lib/weekPlanner'
 import { pickWeekFromArchive } from '../../lib/archivePlanner'
@@ -58,7 +59,7 @@ function BuildPillars({ build }: { build: RecipeWithIngredients['build'] }) {
 }
 
 export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specials, onGenerateForSlot, onPersistSlotRecipe, onEnsureEconomics, onAddToGrocery, onViewRecipe }: Props) {
-  const { meals, loading, setSlot, clearSlot } = useMealPlan()
+  const { week, meals, loading, loadFailed, reload, syncWeek, setSlot, clearSlot } = useMealPlan()
   const [picking, setPicking] = useState<number | null>(null)
   const [listMsg, setListMsg] = useState('')
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
@@ -68,6 +69,9 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
   const cancelRef = useRef(false)
   const runningRef = useRef(false)
   const busy = status.kind !== 'idle'
+  // A plan takes longer than the phone's auto-lock, and a locked phone
+  // suspends the page mid-plan. Keep the screen on while generating.
+  useWakeLock(status.kind === 'planning' || status.kind === 'swapping')
   // Two taps in one tick both read the pre-commit `status`; the ref closes that gap.
   function begin(next: Status): boolean {
     if (runningRef.current) return false
@@ -81,13 +85,22 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
   // let a second plan race the orphaned one over the same slots.
   useEffect(() => () => { cancelRef.current = true }, [])
 
+  // The screen can be a week behind (a window left open past Sunday night). A
+  // run started from it would describe one week and write into another, so the
+  // first tap only moves the screen onto the new week.
+  function weekMoved(): boolean {
+    if (syncWeek() === week) return false
+    setPlanNote('A new week has started — here it is. Tap again to plan it.')
+    return true
+  }
+
   const [costByRecipe, setCostByRecipe] = useState<Record<string, number | null>>({})
   const attemptedEconRef = useRef<Set<string>>(new Set())
   const [previewOpen, setPreviewOpen] = useState(false)
   const [archiveNote, setArchiveNote] = useState('')
 
   async function planFromArchive() {
-    if (busy) return
+    if (busy || weekMoved()) return
     if (filledCount > 0 && !window.confirm('Replace this week’s planned meals with picks from your saved recipes?')) return
     if (!begin({ kind: 'archiving' })) return
     setSummary(null); setArchiveNote(''); setListMsg(''); cancelRef.current = false
@@ -101,7 +114,7 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
       }
       for (const p of picks) {
         if (cancelRef.current) return
-        if (!(await setSlot(p.recipe.id, MEAL_SLOTS[p.slotIndex].meal_type, p.slotIndex))) failed++
+        if (!(await setSlot(p.recipe.id, MEAL_SLOTS[p.slotIndex].meal_type, p.slotIndex, week))) failed++
       }
       const notes: string[] = []
       if (unfilledSlots.length) {
@@ -173,24 +186,30 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
     return null
   }
 
-  async function planWeek() {
-    if (busy) return
-    if (filledCount > 0 && !window.confirm('Replace this week’s planned meals with a fresh plan from your deals?')) return
+  // `onlyEmpty` picks an interrupted plan back up: the meals already in the
+  // week stay, count toward variety, and only the empty slots are generated.
+  async function planWeek(onlyEmpty = false) {
+    if (busy || weekMoved()) return
+    if (!onlyEmpty && filledCount > 0 && !window.confirm('Replace this week’s planned meals with a fresh plan from your deals?')) return
     if (!begin({ kind: 'planning' })) return
     setPlanNote(''); setSummary(null); cancelRef.current = false
-    const chosen: { title: string }[] = []
-    const usedProteins: string[] = []
+    const kept = onlyEmpty ? meals : []
+    const chosen: { title: string }[] = kept.map((m) => ({ title: m.recipe.title }))
+    const usedProteins: string[] = kept
+      .map((m) => mainProtein(m.recipe.build?.pro, (m.recipe.recipe_ingredients ?? []).map((x) => x.name)))
+      .filter((p) => p !== 'other')
     const generated: GeneratedSlotRecipe[] = []
     let failures = 0
     try {
       for (let i = 0; i < MEAL_SLOTS.length; i++) {
         if (cancelRef.current) break
+        if (kept.some((m) => m.slot_order === i)) continue
         setProgress(`Planning ${MEAL_SLOTS[i].label.toLowerCase()} — ${i + 1} of ${MEAL_SLOTS.length}…`)
         let r: Awaited<ReturnType<typeof generateSlot>> = null
         try { r = await generateSlot(i, chosen, usedProteins) } catch { r = null }
         if (cancelRef.current) break
         if (!r) { failures++; continue }
-        const ok = await setSlot(r.id, MEAL_SLOTS[i].meal_type, i)
+        const ok = await setSlot(r.id, MEAL_SLOTS[i].meal_type, i, week)
         if (!ok) { failures++; continue }
         chosen.push({ title: r.title })
         if (r.protein !== 'other') usedProteins.push(r.protein)
@@ -202,7 +221,8 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
     if (!cancelRef.current && generated.length) {
       setSummary({ deals: countMealsUsingDeals(generated, specials), savings: planSavings(generated, specials) })
     }
-    if (failures) setPlanNote(`Couldn’t plan ${failures} slot${failures > 1 ? 's' : ''} — tap Swap to try again.`)
+    if (syncWeek() !== week) setPlanNote('The week changed while planning — plan the new week when you’re ready.')
+    else if (failures) setPlanNote(`Couldn’t plan ${failures} slot${failures > 1 ? 's' : ''} — tap Swap to try again.`)
   }
 
   // Fill in cost/serving for any planned meal still missing it — covers manual
@@ -219,7 +239,7 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
   }, [meals, onEnsureEconomics])
 
   async function swapSlot(i: number) {
-    if (busy) return
+    if (busy || weekMoved()) return
     if (!begin({ kind: 'swapping', slot: i })) return
     setSummary(null); cancelRef.current = false
     try {
@@ -230,7 +250,7 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
         .filter((p) => p !== 'other')
       const r = await generateSlot(i, otherTitles, otherProteins)
       if (cancelRef.current) return
-      if (!r || !(await setSlot(r.id, MEAL_SLOTS[i].meal_type, i))) setPlanNote('Couldn’t find a different meal for that slot — try again.')
+      if (!r || !(await setSlot(r.id, MEAL_SLOTS[i].meal_type, i, week))) setPlanNote('Couldn’t find a different meal for that slot — try again.')
     } catch {
       setPlanNote('Couldn’t find a different meal for that slot — try again.')
     } finally {
@@ -239,6 +259,16 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
   }
 
   if (loading) return <p className="text-gray-400 text-center py-8">Loading this week…</p>
+  // A week that failed to load must not look like an empty one: planning over
+  // it would replace meals that are really there, without asking.
+  if (loadFailed) {
+    return (
+      <div className="text-center py-8 space-y-3">
+        <p className="text-gray-500">Couldn’t load this week’s plan. Check your connection.</p>
+        <button onClick={reload} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-semibold">Try again</button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-3">
@@ -257,10 +287,17 @@ export function ThisWeekPlan({ savedRecipes, inventoryItems, preferences, specia
           <button onClick={() => { cancelRef.current = true }} className="text-sm text-gray-400 font-medium">Cancel</button>
         </div>
       ) : (
-        <button onClick={planWeek} disabled={busy} className="w-full py-3 bg-green-600 text-white rounded-xl font-semibold shadow-sm disabled:opacity-50">
-          {filledCount > 0 ? 'Replan my week from deals' : 'Plan my week from deals'}
-          <span className="block text-xs font-normal text-green-100 mt-0.5">1 breakfast · 1 lunch · 2 dinners</span>
-        </button>
+        <>
+          <button onClick={() => planWeek()} disabled={busy} className="w-full py-3 bg-green-600 text-white rounded-xl font-semibold shadow-sm disabled:opacity-50">
+            {filledCount > 0 ? 'Replan my week from deals' : 'Plan my week from deals'}
+            <span className="block text-xs font-normal text-green-100 mt-0.5">1 breakfast · 1 lunch · 2 dinners</span>
+          </button>
+          {filledCount > 0 && filledCount < MEAL_SLOTS.length && (
+            <button onClick={() => planWeek(true)} disabled={busy} className="w-full py-2 bg-green-50 text-green-700 rounded-xl font-semibold disabled:opacity-50">
+              Fill the {MEAL_SLOTS.length - filledCount} empty slot{MEAL_SLOTS.length - filledCount > 1 ? 's' : ''} from deals
+            </button>
+          )}
+        </>
       )}
 
       {summary && (
