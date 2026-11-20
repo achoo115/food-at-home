@@ -36,10 +36,12 @@ export function useSpecials() {
   useEffect(() => { fetchSpecials() }, [fetchSpecials])
 
   // Replace this week's scanned specials with a fresh scan (idempotent per week).
+  // The new deals are written BEFORE the old ones are removed, so a failed
+  // write leaves last scan's deals in place. Throws with a message to show.
   const saveScanned = useCallback(async (items: ScannedSpecial[], source = 'scan') => {
+    const unchanged = "Could not save the deals — last scan's deals are unchanged. Try again."
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    await supabase.from('specials').delete().eq('week_range', week).eq('source', source)
+    if (!user) throw new Error(unchanged)
     const rows = items
       .filter((it) => it.item && it.item.trim())
       .map((it) => ({
@@ -52,7 +54,19 @@ export function useSpecials() {
         week_range: week,
         source,
       }))
-    if (rows.length) await supabase.from('specials').insert(rows)
+    if (!rows.length) throw new Error('No sale items to save.')
+    const old = await supabase.from('specials').select('id').eq('week_range', week).eq('source', source)
+    if (old.error) throw new Error(unchanged)
+    const { error: insertError } = await supabase.from('specials').insert(rows)
+    if (insertError) throw new Error(unchanged)
+    const oldIds = (old.data ?? []).map((r) => r.id as string)
+    if (oldIds.length) {
+      const { error: deleteError } = await supabase.from('specials').delete().in('id', oldIds)
+      if (deleteError) {
+        await fetchSpecials()
+        throw new Error('The new deals were saved, but the old ones could not be removed. Scan again to tidy up.')
+      }
+    }
     await fetchSpecials()
   }, [week, fetchSpecials])
 
