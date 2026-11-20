@@ -10,6 +10,7 @@ const db = vi.hoisted(() => ({
   fail: {} as Record<string, boolean>, // 'GET' | 'POST' | 'DELETE'
   sent: [] as string[],
   seq: 0,
+  signedIn: true,
 }))
 vi.mock('../lib/supabase', async () => {
   const { createClient } = await import('@supabase/supabase-js')
@@ -43,7 +44,7 @@ vi.mock('../lib/supabase', async () => {
     throw new Error(`unhandled ${method}`)
   }
   const supabase = createClient('http://localhost:54321', 'test-key', { global: { fetch: net as typeof fetch }, auth: { persistSession: false, autoRefreshToken: false } })
-  supabase.auth.getUser = (async () => ({ data: { user: { id: 'u1' } }, error: null })) as unknown as typeof supabase.auth.getUser
+  supabase.auth.getUser = (async () => ({ data: { user: db.signedIn ? { id: 'u1' } : null }, error: null })) as unknown as typeof supabase.auth.getUser
   return { supabase }
 })
 import { useSpecials } from './useSpecials'
@@ -68,6 +69,7 @@ beforeEach(() => {
   db.fail = {}
   db.sent = []
   db.seq = 0
+  db.signedIn = true
 })
 
 describe('useSpecials.saveScanned', () => {
@@ -107,6 +109,16 @@ describe('useSpecials.saveScanned', () => {
     db.fail = {}
     await act(async () => { await result.current.saveScanned([{ item: 'Chicken thighs' }]) })
     expect(items()).toEqual(['Butter/scan/other', 'Chicken thighs/scan/this', 'Eggs/scrape/this'])
+  })
+
+  it('with the session gone, nothing is written and the save reports the failure', async () => {
+    const { result } = await mount()
+    db.signedIn = false
+    db.sent = []
+    let thrown: unknown
+    await act(async () => { await result.current.saveScanned([{ item: 'Chicken thighs' }]).catch((e) => { thrown = e }) })
+    expect(thrown).toBeInstanceOf(Error)
+    expect(db.sent).toEqual([])
   })
 
   it('a scan with no named items changes nothing', async () => {
