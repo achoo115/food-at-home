@@ -22,6 +22,8 @@ export interface ScannedSpecial {
 }
 
 // Current-week specials (source of the "plan around what's on sale" loop).
+export type SpecialsStore = ReturnType<typeof useSpecials>
+
 export function useSpecials() {
   const week = weekStart()
   const [specials, setSpecials] = useState<Special[]>([])
@@ -37,9 +39,12 @@ export function useSpecials() {
 
   // Replace this week's scanned specials with a fresh scan (idempotent per week).
   // The new deals are written BEFORE the old ones are removed, so a failed
-  // write leaves last scan's deals in place. Throws with a message to show.
+  // write leaves last scan's deals in place. The old ones are whatever this
+  // week holds from before the new rows' own timestamp — no lookup that an
+  // offline cache could answer, and an earlier half-finished attempt goes too.
+  // Throws with a message to show.
   const saveScanned = useCallback(async (items: ScannedSpecial[], source = 'scan') => {
-    const unchanged = "Could not save the deals — last scan's deals are unchanged. Try again."
+    const unchanged = "Could not save the deals — last scan's deals are still here."
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error(unchanged)
     const rows = items
@@ -55,19 +60,13 @@ export function useSpecials() {
         source,
       }))
     if (!rows.length) throw new Error('No sale items to save.')
-    const old = await supabase.from('specials').select('id').eq('week_range', week).eq('source', source)
-    if (old.error) throw new Error(unchanged)
-    const { error: insertError } = await supabase.from('specials').insert(rows)
-    if (insertError) throw new Error(unchanged)
-    const oldIds = (old.data ?? []).map((r) => r.id as string)
-    if (oldIds.length) {
-      const { error: deleteError } = await supabase.from('specials').delete().in('id', oldIds)
-      if (deleteError) {
-        await fetchSpecials()
-        throw new Error('The new deals were saved, but the old ones could not be removed. Scan again to tidy up.')
-      }
-    }
+    const { data: written, error: insertError } = await supabase.from('specials').insert(rows).select('created_at')
+    const since = written?.[0]?.created_at as string | undefined
+    if (insertError || !since) throw new Error(unchanged)
+    const { error: deleteError } = await supabase.from('specials').delete()
+      .eq('week_range', week).eq('source', source).lt('created_at', since)
     await fetchSpecials()
+    if (deleteError) throw new Error('The new deals were saved, but the old ones could not be removed.')
   }, [week, fetchSpecials])
 
   const clearWeek = useCallback(async () => {

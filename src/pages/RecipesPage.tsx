@@ -28,7 +28,8 @@ export function RecipesPage() {
   const cookingLog = useCookingLog()
   const { preferences } = usePreferences()
   const grocery = useGroceryList()
-  const { specials } = useSpecials()
+  const specialsStore = useSpecials()
+  const { specials } = specialsStore
   const [tab, setTab] = useState<Tab>('week')
   const [selectedSpoonId, setSelectedSpoonId] = useState<number | null>(null)
   const [cookRecipe, setCookRecipe] = useState<{ id?: string; name: string; ingredients: { name: string; quantity: number; unit: string }[] } | null>(null)
@@ -92,7 +93,7 @@ export function RecipesPage() {
 
       {tab === 'week' && (
         <div className="space-y-3">
-          <SpecialsCard />
+          <SpecialsCard store={specialsStore} />
           <ThisWeekPlan
             savedRecipes={recipes.savedRecipes}
             inventoryItems={inventoryItems}

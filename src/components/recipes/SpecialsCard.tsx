@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { useSpecials } from '../../hooks/useSpecials'
+import type { SpecialsStore } from '../../hooks/useSpecials'
 import { SpecialsScanner } from './SpecialsScanner'
 
 // "On sale this week" — the ingested Whole Foods specials the planner favors.
-export function SpecialsCard() {
-  const { specials, loading, saveScanned, clearWeek, totalSavings } = useSpecials()
+// It shows and saves through the page's own store, so a new scan reaches the planner.
+export function SpecialsCard({ store }: { store: SpecialsStore }) {
+  const { specials, loading, saveScanned, clearWeek, totalSavings } = store
   const [scanning, setScanning] = useState(false)
 
   if (loading) return null

@@ -44,6 +44,28 @@ export function SpecialsScanner({ onScanned, onDone }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [partial, setPartial] = useState('')
+  // Deals that were read but not saved: kept so a failed save can be retried
+  // without photographing and reading the flyer again.
+  const [unsaved, setUnsaved] = useState<{ items: ScannedSpecial[]; unread: number; pages: number } | null>(null)
+
+  async function save(items: ScannedSpecial[], unread: number, pages: number) {
+    setBusy(true)
+    setError('')
+    setStatus(`Saving ${items.length} deals…`)
+    try {
+      await onScanned(items)
+      setUnsaved(null)
+      // The save replaces this week's scanned deals, so a page that dropped
+      // out is worth knowing about before closing.
+      if (unread) setPartial(`Saved ${items.length} deals, but ${unread} of ${pages} pages could not be read. Scan again to include them.`)
+      else onDone()
+    } catch (err) {
+      setUnsaved({ items, unread, pages })
+      setError(err instanceof Error ? err.message : 'Could not save the deals.')
+      setBusy(false)
+      setStatus('')
+    }
+  }
 
   // null = the page could not be read (bad file, error, or no answer in time)
   async function scanOne(file: File): Promise<ScannedSpecial[] | null> {
@@ -60,6 +82,9 @@ export function SpecialsScanner({ onScanned, onDone }: Props) {
   async function handleFiles(files: File[]) {
     setBusy(true)
     setError('')
+    setUnsaved(null)
+    let merged: ScannedSpecial[]
+    let unread: number
     try {
       // Scan pages concurrently (cap 5) so 25 screenshots take seconds, not a minute;
       // tolerate per-page failures and just merge whatever parsed.
@@ -77,20 +102,16 @@ export function SpecialsScanner({ onScanned, onDone }: Props) {
       }
       await Promise.all(Array.from({ length: Math.min(CONCURRENCY, files.length) }, worker))
 
-      const unread = results.filter((r) => r === null).length
-      const merged = dedupe(results.flatMap((r) => r ?? []))
+      unread = results.filter((r) => r === null).length
+      merged = dedupe(results.flatMap((r) => r ?? []))
       if (merged.length === 0) throw new Error(unread ? 'Those pages could not be read — try again.' : 'No sale items found in those images.')
-      setStatus(`Saving ${merged.length} deals…`)
-      await onScanned(merged)
-      // The save replaces this week's scanned deals, so a page that dropped
-      // out is worth knowing about before closing.
-      if (unread) setPartial(`Saved ${merged.length} deals, but ${unread} of ${files.length} pages could not be read. Scan again to include them.`)
-      else onDone()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not read the flyer.')
       setBusy(false)
       setStatus('')
+      return
     }
+    await save(merged, unread, files.length)
   }
 
   function onPick(e: ChangeEvent<HTMLInputElement>) {
@@ -113,6 +134,11 @@ export function SpecialsScanner({ onScanned, onDone }: Props) {
         </div>
       ) : (
         <>
+          {unsaved && (
+            <button onClick={() => save(unsaved.items, unsaved.unread, unsaved.pages)} className="w-full py-2 bg-green-600 text-white rounded-lg font-semibold text-sm">
+              Try saving again
+            </button>
+          )}
           <button onClick={() => { fileRef.current?.setAttribute('capture', 'environment'); fileRef.current?.click() }}
             className="w-full py-6 border-2 border-dashed border-gray-300 rounded-xl text-gray-500">
             Take a photo of the flyer
