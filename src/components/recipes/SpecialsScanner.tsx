@@ -81,6 +81,7 @@ export function SpecialsScanner({ onScanned, onDone }: Props) {
   async function handleFiles(files: File[]) {
     setBusy(true)
     setError('')
+    setUnsaved(null) // a new scan replaces deals left over from a failed save
     let merged: ScannedSpecial[]
     let unread: number
     try {

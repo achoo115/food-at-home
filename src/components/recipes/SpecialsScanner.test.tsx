@@ -56,6 +56,19 @@ describe('SpecialsScanner', () => {
     expect(screen.queryByText(/could not be read/)).toBeNull()
   })
 
+  it('when no page can be read, the scanner says so and is ready for another try', async () => {
+    const onScanned = vi.fn<(items: unknown[]) => Promise<void>>(async () => {})
+    const { container } = render(<SpecialsScanner onScanned={onScanned} onDone={vi.fn()} />)
+    const input = container.querySelector('input[type=file]') as HTMLInputElement
+    Object.defineProperty(input, 'files', { value: [new File(['hang'], 'p1.png', { type: 'image/png' })], configurable: true })
+    await act(async () => { fireEvent.change(input) })
+    await vi.waitFor(() => expect(sent.n).toBe(1))
+    await act(async () => { await vi.advanceTimersByTimeAsync(61_000) })
+    expect(screen.getByText('Those pages could not be read — try again.')).toBeTruthy()
+    expect(screen.getByText('Take a photo of the flyer')).toBeTruthy()
+    expect(onScanned).not.toHaveBeenCalled()
+  })
+
   it('when the save fails, the scanner shows why and stays open instead of closing as if saved', async () => {
     const onScanned = vi.fn<(items: unknown[]) => Promise<void>>(async () => { throw new Error("Could not save the deals — last scan's deals are unchanged. Try again.") })
     const onDone = vi.fn()

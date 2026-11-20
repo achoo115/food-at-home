@@ -8,6 +8,8 @@ import { DEFAULT_PREFERENCES } from '../lib/preferences'
 // recipe insert failed, ingredients insert failed). The buttons are real; only
 // the data hooks and the two heavy week cards are replaced.
 const saveRecipe = vi.fn()
+// What the deals card and the planner were each handed.
+const seen = vi.hoisted(() => ({ card: null as unknown, plan: null as unknown }))
 const GEN = {
   title: 'Chicken Bowl', description: '', prep_time: 10, cook_time: 20, instructions: 'Cook.',
   ingredients: [{ name: 'chicken', quantity: 1, unit: 'lb', base_ingredient: 'chicken' }],
@@ -24,9 +26,9 @@ vi.mock('../hooks/useInventory', () => ({ useInventory: () => ({ items: [{ id: '
 vi.mock('../hooks/useCookingLog', () => ({ useCookingLog: () => ({ logCook: vi.fn() }) }))
 vi.mock('../hooks/usePreferences', () => ({ usePreferences: () => ({ preferences: DEFAULT_PREFERENCES }) }))
 vi.mock('../hooks/useGroceryList', () => ({ useGroceryList: () => ({ addItem: vi.fn() }) }))
-vi.mock('../hooks/useSpecials', () => ({ useSpecials: () => ({ specials: [] }) }))
-vi.mock('../components/recipes/ThisWeekPlan', () => ({ ThisWeekPlan: () => null }))
-vi.mock('../components/recipes/SpecialsCard', () => ({ SpecialsCard: () => null }))
+vi.mock('../hooks/useSpecials', () => ({ useSpecials: () => ({ specials: [] }) })) // a new list per call
+vi.mock('../components/recipes/ThisWeekPlan', () => ({ ThisWeekPlan: (p: { specials: unknown }) => { seen.plan = p.specials; return null } }))
+vi.mock('../components/recipes/SpecialsCard', () => ({ SpecialsCard: (p: { store: { specials: unknown } }) => { seen.card = p.store.specials; return null } }))
 vi.mock('../lib/spoonacular', () => ({
   getRecipeDetail: async () => ({
     id: 7, title: 'Leek Soup', summary: 'Soup.', instructions: 'Simmer.', preparationMinutes: 5, cookingMinutes: 20, readyInMinutes: 25,
@@ -52,6 +54,15 @@ async function searchResultSave() {
   await screen.findByText('Simmer.')
   await act(async () => { fireEvent.click(screen.getByText('Save')) })
 }
+
+describe('RecipesPage — deals', () => {
+  it('the deals card and the planner read the same deals, so a scan reaches the planner without a reload', () => {
+    seen.card = null; seen.plan = null
+    render(<RecipesPage />)
+    expect(Array.isArray(seen.card)).toBe(true)
+    expect(seen.plan).toBe(seen.card)
+  })
+})
 
 describe('RecipesPage — Save reports what saveRecipe did', () => {
   it('AI Chef: saved row → Saved', async () => {

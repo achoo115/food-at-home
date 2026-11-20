@@ -63,7 +63,10 @@ export function useSpecials() {
     // No timestamp back means the write failed (or its answer was lost).
     const { data: written } = await supabase.from('specials').insert(rows).select('created_at')
     const since = written?.[0]?.created_at as string | undefined
-    if (!since) throw new Error(unchanged)
+    if (!since) {
+      await fetchSpecials() // a write whose answer was lost shows up here
+      throw new Error(unchanged)
+    }
     const { error: deleteError } = await supabase.from('specials').delete()
       .eq('week_range', week).eq('source', source).lt('created_at', since)
     await fetchSpecials()

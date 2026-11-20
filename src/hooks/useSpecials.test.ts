@@ -80,6 +80,7 @@ describe('useSpecials.saveScanned', () => {
     db.loseInsertReply = true
     const thrown = await failing(() => result.current.saveScanned([{ item: 'Chicken thighs' }]))
     expect(thrown).toBeInstanceOf(Error)
+    expect(result.current.specials.map((s) => s.item).sort()).toEqual(['Avocados', 'Chicken thighs', 'Eggs', 'Salmon'])
     db.loseInsertReply = false
     await act(async () => { await result.current.saveScanned([{ item: 'Chicken thighs' }]) })
     expect(items()).toEqual(REPLACED)

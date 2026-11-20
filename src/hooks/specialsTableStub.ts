@@ -11,6 +11,8 @@ export const db = {
   loseInsertReply: false,
   /** Longest request URL the "server" accepts. */
   maxUrl: 8000,
+  /** What the scan function answers, when set. */
+  scanned: undefined as unknown,
   sent: [] as string[],
   seq: 0,
   signedIn: true,
@@ -20,6 +22,7 @@ export const db = {
     db.fail = {}
     db.loseInsertReply = false
     db.maxUrl = 8000
+    db.scanned = undefined
     db.sent = []
     db.signedIn = true
   },
@@ -52,7 +55,7 @@ export function makeNet(scanned: unknown = []) {
   return async (input: unknown, init?: { method?: string; body?: unknown }) => {
     const url = new URL(String(input))
     const method = init?.method ?? 'GET'
-    if (url.pathname.includes('/functions/')) return json(scanned)
+    if (url.pathname.includes('/functions/')) return json(db.scanned ?? scanned)
     db.sent.push(`${method} ${url.pathname}${url.search}`)
     if (String(input).length > db.maxUrl) return json({ message: 'URI too long' }, 414)
     if (db.fail[method]) return json({ message: 'TypeError: Failed to fetch' }, 500)

@@ -27,12 +27,15 @@ function Page() {
   )
 }
 
-async function scanOnePage(container: HTMLElement) {
-  await waitFor(() => expect(screen.getByText('Re-scan flyer')).toBeTruthy())
-  fireEvent.click(screen.getByText('Re-scan flyer'))
+async function pickOnePage(container: HTMLElement) {
   const input = container.querySelector('input[type=file]') as HTMLInputElement
   Object.defineProperty(input, 'files', { value: [new File(['fine'], 'p1.png', { type: 'image/png' })], configurable: true })
   await act(async () => { fireEvent.change(input) })
+}
+async function scanOnePage(container: HTMLElement) {
+  await waitFor(() => expect(screen.getByText('Re-scan flyer')).toBeTruthy())
+  fireEvent.click(screen.getByText('Re-scan flyer'))
+  await pickOnePage(container)
 }
 
 beforeEach(() => { db.reset([{ id: 'old-1', item: 'Salmon', week_range: weekStart(), source: 'scan' }]) })
@@ -57,5 +60,16 @@ describe('SpecialsCard', () => {
     await waitFor(() => expect(screen.getByTestId('planner').textContent).toBe('Chicken thighs'))
     expect(screen.queryByText('Try saving again')).toBeNull()
     expect(db.rows.map((r) => r.item)).toEqual(['Chicken thighs'])
+  })
+
+  it('after a failed save, a new scan that finds nothing does not leave the old deals behind a retry button', async () => {
+    db.fail.POST = true
+    const { container } = render(<Page />)
+    await scanOnePage(container)
+    await waitFor(() => expect(screen.getByText('Try saving again')).toBeTruthy())
+    db.scanned = []
+    await pickOnePage(container)
+    await waitFor(() => expect(screen.getByText('No sale items found in those images.')).toBeTruthy())
+    expect(screen.queryByText('Try saving again')).toBeNull()
   })
 })
