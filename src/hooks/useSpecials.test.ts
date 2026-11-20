@@ -104,8 +104,10 @@ describe('useSpecials.saveScanned', () => {
 
   it('a scan with no named items changes nothing', async () => {
     const { result } = await mount()
+    db.sent = []
     const thrown = await failing(() => result.current.saveScanned([{ item: '   ' }]))
     expect(thrown).toBeInstanceOf(Error)
+    expect(db.sent).toEqual([])
     expect(items()).toEqual(UNTOUCHED)
   })
 })

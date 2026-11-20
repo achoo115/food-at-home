@@ -54,7 +54,6 @@ export function SpecialsScanner({ onScanned, onDone }: Props) {
     setStatus(`Saving ${items.length} deals…`)
     try {
       await onScanned(items)
-      setUnsaved(null)
       // The save replaces this week's scanned deals, so a page that dropped
       // out is worth knowing about before closing.
       if (unread) setPartial(`Saved ${items.length} deals, but ${unread} of ${pages} pages could not be read. Scan again to include them.`)
@@ -82,7 +81,6 @@ export function SpecialsScanner({ onScanned, onDone }: Props) {
   async function handleFiles(files: File[]) {
     setBusy(true)
     setError('')
-    setUnsaved(null)
     let merged: ScannedSpecial[]
     let unread: number
     try {
